@@ -1,0 +1,62 @@
+name: Build & Release
+
+# Triggers:
+#   push of a version tag  →  full build + publish to GitHub Release
+#   pull_request to main   →  build-only (no publish), smoke-test the pipeline
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node ──────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── Dependencies ──────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Build & Publish ───────────────────────────────────────────
+      # On a version tag:  electron-builder builds the NSIS installer
+      #   and publishes it (+ latest.yml) to the GitHub Release.
+      #   GH_TOKEN gives electron-builder write access to Releases.
+      # On a PR / non-tag push:  build only, no publish.
+      - name: Build (and publish on tag)
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            npx electron-builder --win --publish always
+          else
+            npx electron-builder --win --publish never
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional code-signing — add CSC_LINK / CSC_KEY_PASSWORD secrets
+          # in the repo settings if you have a code-signing certificate.
+          # CSC_LINK:         ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      # ── Upload artifacts (PR builds only) ────────────────────────
+      - name: Upload installer artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalPrep-installer-pr${{ github.event.pull_request.number }}
+          path: dist/*.exe
+          retention-days: 7

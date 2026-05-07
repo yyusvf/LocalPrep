@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalPrep</title>
+  <!-- Design system -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/titlebar.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/player.css">
+  <link rel="stylesheet" href="css/content.css">
+  <link rel="stylesheet" href="css/components.css">
+  <!-- Tab styles -->
+  <link rel="stylesheet" href="css/tabs/sample-rate.css">
+  <link rel="stylesheet" href="css/tabs/metadata.css">
+  <link rel="stylesheet" href="css/tabs/settings.css">
+  <link rel="stylesheet" href="css/tabs/history.css">
+</head>
+<body>
+
+<!-- ── Titlebar ──────────────────────────────────────────────────── -->
+<div id="titlebar" class="titlebar">
+  <div class="titlebar-drag"></div>
+  <div class="titlebar-controls">
+    <button class="titlebar-btn" id="btnMinimize" title="Minimize"></button>
+    <button class="titlebar-btn" id="btnMaximize" title="Maximize"></button>
+    <button class="titlebar-btn titlebar-btn--close" id="btnClose" title="Close"></button>
+  </div>
+</div>
+
+<!-- ── App Shell ─────────────────────────────────────────────────── -->
+<div class="app-shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon" id="logoIcon"></div>
+      <span class="logo-text">LocalPrep</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-tab="sample-rate" href="#"><span class="nav-icon" id="icon-sample-rate"></span><span class="nav-label" data-i18n="nav.samplerate">Sample Rate</span></a>
+      <a class="nav-item" data-tab="format"      href="#"><span class="nav-icon" id="icon-format"></span><span class="nav-label" data-i18n="nav.format">Format</span></a>
+      <a class="nav-item" data-tab="metadata"    href="#"><span class="nav-icon" id="icon-metadata"></span><span class="nav-label" data-i18n="nav.metadata">Metadata</span></a>
+      <div class="nav-divider"></div>
+      <a class="nav-item" data-tab="history"     href="#"><span class="nav-icon" id="icon-history"></span><span class="nav-label" data-i18n="nav.history">History</span></a>
+      <a class="nav-item" data-tab="settings"    href="#"><span class="nav-icon-wrap"><span class="nav-icon" id="icon-settings"></span><span class="update-nav-badge" id="updateNavBadge" style="display:none"></span></span><span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+    </nav>
+
+    <div class="ffmpeg-status" id="ffmpegStatus">
+      <div class="ffmpeg-dot" id="ffmpegDot"></div>
+      <span class="ffmpeg-label" id="ffmpegLabel">Checking ffmpeg…</span>
+    </div>
+
+    <!-- Player bar -->
+    <div class="player-bar">
+      <div class="player-file-info">
+        <span class="player-status-icon" id="playerStatusIcon">■</span>
+        <span class="player-filename"    id="playerFilename">No file selected</span>
+      </div>
+      <div class="player-controls">
+        <button class="player-play-btn" id="playerPlayBtn" disabled></button>
+        <div class="player-volume">
+          <button class="player-vol-btn" id="playerVolBtn"></button>
+          <input type="range" class="vol-slider" id="volSlider" min="0" max="100" value="80">
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Content ───────────────────────────────────────────────────── -->
+  <main class="content">
+
+    <!-- Update notification banner (hidden until update available) -->
+    <div id="updateBanner" class="update-banner" style="display:none" role="status" aria-live="polite">
+      <span class="update-banner-icon">↑</span>
+      <span class="update-banner-msg" id="updateBannerMsg">Update available</span>
+      <div class="update-progress-wrap" id="updateProgressWrap" style="display:none">
+        <div class="update-progress-fill" id="updateProgressFill"></div>
+      </div>
+      <button class="btn btn-sm btn-primary" id="updateInstallBtn" style="display:none">Restart &amp; Install</button>
+      <button class="update-banner-dismiss" id="updateBannerDismiss" title="Dismiss">×</button>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB 1 – SAMPLE RATE
+         ════════════════════════════════════ -->
+    <div class="tab-panel active" data-panel="sample-rate">
+      <div class="panel-header">
+        <h1 class="panel-title" data-i18n="sr.title">Sample Rate</h1>
+        <p class="panel-subtitle" data-i18n="sr.subtitle">Convert audio files to a target sample rate</p>
+      </div>
+
+      <div class="conv-workspace">
+        <!-- Toolbar -->
+        <div class="conv-toolbar">
+          <div class="toolbar-row">
+            <button class="btn btn-secondary btn-sm" id="srFolderBtn" data-i18n="sr.chooseFolder">Choose Folder</button>
+            <div class="folder-row">
+              <input class="input input-sm" id="srFolderPath" type="text" placeholder="Folder path…" readonly>
+            </div>
+            <label class="checkbox-label"><input type="checkbox" id="srSubfolders"><span data-i18n="sr.subfolders">Subfolders</span></label>
+          </div>
+          <div class="toolbar-row">
+            <span class="toolbar-label" data-i18n="sr.source">Source</span>
+            <select class="select" id="srSourceRate" style="width:120px">
+              <option value="">All</option>
+              <option value="44100">44100 Hz</option>
+              <option value="48000">48000 Hz</option>
+              <option value="88200">88200 Hz</option>
+              <option value="96000">96000 Hz</option>
+              <option value="176400">176400 Hz</option>
+              <option value="192000">192000 Hz</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input class="input input-sm sr-custom" id="srSourceCustom" type="number" placeholder="Hz" style="display:none;width:80px">
+            <span class="rate-arrow">→</span>
+            <span class="toolbar-label" data-i18n="sr.target">Target</span>
+            <select class="select" id="srTargetRate" style="width:120px">
+              <option value="44100" selected>44100 Hz</option>
+              <option value="48000">48000 Hz</option>
+              <option value="88200">88200 Hz</option>
+              <option value="96000">96000 Hz</option>
+              <option value="176400">176400 Hz</option>
+              <option value="192000">192000 Hz</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input class="input input-sm sr-custom" id="srTargetCustom" type="number" placeholder="Hz" style="display:none;width:80px">
+            <button class="btn btn-primary btn-sm" id="srSearchBtn" data-i18n="sr.search">Search Files</button>
+          </div>
+        </div>
+
+        <!-- Main split -->
+        <div class="conv-main">
+          <!-- File list -->
+          <div class="conv-files">
+            <div class="list-toolbar">
+              <button class="btn-link" id="srSelectAll">All</button>
+              <span style="color:var(--text-tertiary);font-size:11px">·</span>
+              <button class="btn-link" id="srDeselectAll">None</button>
+              <input class="input" id="srFilter" type="text" placeholder="Filter files…">
+            </div>
+            <div class="file-table-outer" id="srTableWrap">
+              <div class="ft-empty"><p>Choose a folder and click Search Files</p></div>
+            </div>
+            <div class="statusbar" id="srStatusBar">0 files</div>
+          </div>
+
+          <!-- Options -->
+          <div class="conv-options">
+            <div>
+              <p class="options-heading">Output</p>
+              <label class="radio-label"><input type="radio" name="srMode" value="new"       id="srNewFile"  checked><span data-i18n="sr.newFile">Create new file</span></label>
+              <label class="radio-label" style="margin-top:5px"><input type="radio" name="srMode" value="overwrite" id="srOverwrite"><span data-i18n="sr.overwrite">Overwrite original</span></label>
+            </div>
+            <div id="srSuffixRow">
+              <label class="checkbox-label"><input type="checkbox" id="srUseSuffix" checked><span data-i18n="sr.suffix">Add suffix</span></label>
+              <input class="input input-sm" id="srSuffix" type="text" value="_44100" placeholder="_44100">
+            </div>
+            <div>
+              <p class="options-heading">Output Folder</p>
+              <div class="out-folder-row">
+                <input class="input" id="srOutFolderPath" type="text" placeholder="Same as source" readonly>
+                <button class="btn btn-secondary btn-xs" id="srOutFolderBtn">…</button>
+                <button class="btn btn-ghost btn-xs" id="srOutFolderClear" title="Clear">✕</button>
+              </div>
+            </div>
+            <div class="conv-actions">
+              <div class="conv-actions-row">
+                <button class="btn btn-danger-outline btn-sm" id="srCancelBtn" style="display:none" data-i18n="sr.cancel">Cancel</button>
+              </div>
+              <button class="btn btn-primary btn-full" id="srConvertBtn" disabled data-i18n="sr.convert">Convert Selected</button>
+              <button class="btn btn-ghost btn-sm btn-full" id="srHistoryBtn" data-i18n="sr.history">View History</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section" id="srProgressSection" style="display:none">
+          <div class="progress-row">
+            <span class="progress-label" id="srFileLabel">—</span>
+            <span class="progress-eta"   id="srEta"></span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="srFileBar"></div></div>
+          <div class="progress-row">
+            <span class="progress-label">Overall</span>
+            <span class="progress-pct" id="srOverallPct">0%</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="srOverallBar"></div></div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-section" id="srLogSection" style="display:none">
+          <div class="log-header">
+            <span>Log</span>
+            <button class="btn-link" id="srExportLog">Export</button>
+            <button class="btn-link" id="srClearLog">Clear</button>
+          </div>
+          <div class="log-body" id="srLogBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB 2 – FORMAT
+         ════════════════════════════════════ -->
+    <div class="tab-panel" data-panel="format">
+      <div class="panel-header">
+        <h1 class="panel-title" data-i18n="fmt.title">Format</h1>
+        <p class="panel-subtitle" data-i18n="fmt.subtitle">Convert between audio formats</p>
+      </div>
+
+      <div class="conv-workspace">
+        <div class="conv-toolbar">
+          <div class="toolbar-row">
+            <button class="btn btn-secondary btn-sm" id="fmtFolderBtn">Choose Folder</button>
+            <div class="folder-row">
+              <input class="input input-sm" id="fmtFolderPath" type="text" placeholder="Folder path…" readonly>
+            </div>
+            <label class="checkbox-label"><input type="checkbox" id="fmtSubfolders"><span>Subfolders</span></label>
+          </div>
+          <div class="toolbar-row">
+            <span class="toolbar-label">Source</span>
+            <select class="select" id="fmtSource" style="width:110px">
+              <option value="">All</option>
+              <option value="mp3">MP3</option>
+              <option value="flac">FLAC</option>
+              <option value="wav">WAV</option>
+              <option value="ogg">OGG</option>
+              <option value="m4a">M4A / AAC</option>
+              <option value="aiff">AIFF</option>
+            </select>
+            <span class="rate-arrow">→</span>
+            <span class="toolbar-label">Target</span>
+            <select class="select" id="fmtTarget" style="width:110px">
+              <option value="mp3" selected>MP3</option>
+              <option value="flac">FLAC</option>
+              <option value="wav">WAV</option>
+              <option value="ogg">OGG</option>
+              <option value="m4a">M4A / AAC</option>
+              <option value="aiff">AIFF</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="fmtSearchBtn">Search Files</button>
+          </div>
+        </div>
+
+        <div class="conv-main">
+          <div class="conv-files">
+            <div class="list-toolbar">
+              <button class="btn-link" id="fmtSelectAll">All</button>
+              <span style="color:var(--text-tertiary);font-size:11px">·</span>
+              <button class="btn-link" id="fmtDeselectAll">None</button>
+              <input class="input" id="fmtFilter" type="text" placeholder="Filter files…">
+            </div>
+            <div class="file-table-outer" id="fmtTableWrap">
+              <div class="ft-empty"><p>Choose a folder and click Search Files</p></div>
+            </div>
+            <div class="statusbar" id="fmtStatusBar">0 files</div>
+          </div>
+
+          <div class="conv-options">
+            <div>
+              <p class="options-heading">Output</p>
+              <label class="checkbox-label"><input type="checkbox" id="fmtDeleteOriginal"><span data-i18n="fmt.deleteOriginal">Delete original</span></label>
+            </div>
+            <div>
+              <p class="options-heading">Suffix</p>
+              <input class="input input-sm" id="fmtSuffix" type="text" placeholder="(none)" value="">
+            </div>
+            <div>
+              <p class="options-heading">Output Folder</p>
+              <div class="out-folder-row">
+                <input class="input" id="fmtOutFolderPath" type="text" placeholder="Same as source" readonly>
+                <button class="btn btn-secondary btn-xs" id="fmtOutFolderBtn">…</button>
+                <button class="btn btn-ghost btn-xs" id="fmtOutFolderClear">✕</button>
+              </div>
+            </div>
+            <div id="fmtQualitySection" class="quality-section">
+              <p class="options-heading">Quality</p>
+              <div id="fmtQualityWrap"></div>
+            </div>
+            <div class="conv-actions">
+              <button class="btn btn-danger-outline btn-sm" id="fmtCancelBtn" style="display:none">Cancel</button>
+              <button class="btn btn-primary btn-full" id="fmtConvertBtn" disabled>Convert Selected</button>
+              <button class="btn btn-ghost btn-sm btn-full" id="fmtHistoryBtn">View History</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="progress-section" id="fmtProgressSection" style="display:none">
+          <div class="progress-row">
+            <span class="progress-label" id="fmtFileLabel">—</span>
+            <span class="progress-eta"   id="fmtEta"></span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="fmtFileBar"></div></div>
+          <div class="progress-row">
+            <span class="progress-label">Overall</span>
+            <span class="progress-pct" id="fmtOverallPct">0%</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="fmtOverallBar"></div></div>
+        </div>
+
+        <div class="log-section" id="fmtLogSection" style="display:none">
+          <div class="log-header">
+            <span>Log</span>
+            <button class="btn-link" id="fmtClearLog">Clear</button>
+          </div>
+          <div class="log-body" id="fmtLogBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB 3 – METADATA
+         ════════════════════════════════════ -->
+    <div class="tab-panel" data-panel="metadata">
+      <div class="panel-header">
+        <h1 class="panel-title" data-i18n="meta.title">Metadata</h1>
+        <p class="panel-subtitle" data-i18n="meta.subtitle">Edit tags, cover art and track order</p>
+      </div>
+
+      <div class="meta-workspace">
+        <!-- Toolbar -->
+        <div class="meta-toolbar">
+          <button class="btn btn-secondary btn-sm" id="metaFolderBtn">Choose Folder</button>
+          <input class="input input-sm" id="metaFolderPath" type="text" placeholder="Folder path…" readonly style="flex:1;min-width:0">
+          <label class="checkbox-label"><input type="checkbox" id="metaSubfolders"><span>Subfolders</span></label>
+          <button class="btn btn-primary btn-sm" id="metaSearchBtn">Search Files</button>
+        </div>
+
+        <!-- Main split: editor left, file list right -->
+        <div class="meta-main">
+
+          <!-- Editor -->
+          <div class="meta-editor">
+            <div class="meta-editor-scroll">
+              <!-- Cover art -->
+              <div class="cover-area">
+                <div class="cover-wrap" id="metaCoverWrap">
+                  <img class="cover-preview" id="metaCoverImg" alt="">
+                </div>
+                <span class="cover-status" id="metaCoverStatus"></span>
+                <div class="cover-btns">
+                  <button class="btn btn-secondary btn-xs" id="metaCoverFile" data-i18n="meta.coverFile">Choose File</button>
+                  <button class="btn btn-ghost btn-xs"     id="metaCoverRemove" data-i18n="meta.coverRemove">Remove</button>
+                  <button class="btn btn-ghost btn-xs"     id="metaCoverSearch" data-i18n="meta.coverSearch">Search</button>
+                </div>
+              </div>
+
+              <!-- Tag fields -->
+              <div class="field-group"><label class="field-label">Title</label>    <input class="input" id="mTitle"      type="text"></div>
+              <div class="field-group"><label class="field-label">Artist</label>   <input class="input" id="mArtist"     type="text"></div>
+              <div class="field-group"><label class="field-label">Album</label>    <input class="input" id="mAlbum"      type="text"></div>
+              <div class="field-group"><label class="field-label">Album Artist</label><input class="input" id="mAlbumArtist" type="text"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <div class="field-group"><label class="field-label">Year</label>  <input class="input" id="mYear"   type="text" maxlength="4"></div>
+                <div class="field-group"><label class="field-label">Track</label> <input class="input" id="mTrack"  type="text"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <div class="field-group"><label class="field-label">Genre</label> <input class="input" id="mGenre"      type="text"></div>
+                <div class="field-group"><label class="field-label">Disc</label>  <input class="input" id="mDiscNumber" type="text"></div>
+              </div>
+              <div class="field-group"><label class="field-label">Composer</label><input class="input" id="mComposer" type="text"></div>
+              <div class="field-group"><label class="field-label">Comment</label> <input class="input" id="mComment"  type="text"></div>
+            </div>
+
+            <div class="meta-editor-footer">
+              <button class="btn btn-primary btn-sm" style="flex:1" id="metaSaveBtn" disabled data-i18n="meta.save">Save</button>
+              <button class="btn btn-ghost btn-sm"   id="metaResetBtn" data-i18n="meta.reset">Reset</button>
+            </div>
+          </div>
+
+          <!-- File list -->
+          <div class="meta-files">
+            <div class="list-toolbar">
+              <button class="btn-link" id="metaSelectAll">All</button>
+              <span style="color:var(--text-tertiary);font-size:11px">·</span>
+              <button class="btn-link" id="metaDeselectAll">None</button>
+              <input class="input" id="metaFilter" type="text" placeholder="Filter files…">
+            </div>
+            <div class="file-table-outer" id="metaTableWrap">
+              <div class="ft-empty"><p>Choose a folder and click Search Files</p></div>
+            </div>
+            <div class="statusbar" id="metaStatusBar">0 files</div>
+          </div>
+        </div>
+
+        <!-- Action bar -->
+        <div class="meta-actions">
+          <button class="btn btn-secondary btn-sm" id="metaBatchRename" data-i18n="meta.batchRename">Batch Rename</button>
+          <button class="btn btn-secondary btn-sm" id="metaTracklist"   data-i18n="meta.tracklist">Tracklist Sequencer</button>
+          <div style="flex:1"></div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-section" id="metaLogSection" style="display:none">
+          <div class="log-header"><span>Log</span></div>
+          <div class="log-body"   id="metaLogBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB 4 – HISTORY
+         ════════════════════════════════════ -->
+    <div class="tab-panel" data-panel="history">
+      <div class="panel-header">
+        <h1 class="panel-title" data-i18n="hist.title">History</h1>
+        <p class="panel-subtitle" data-i18n="hist.subtitle">Review and undo previous operations</p>
+      </div>
+
+      <div class="history-workspace">
+        <div class="history-toolbar">
+          <select class="select" id="histFilterType" style="width:150px">
+            <option value="">All types</option>
+            <option value="sample-rate">Sample Rate</option>
+            <option value="format">Format</option>
+            <option value="metadata">Metadata</option>
+          </select>
+          <div style="flex:1"></div>
+          <button class="btn btn-danger-outline btn-sm" id="histClearBtn" data-i18n="hist.clearAll">Clear All</button>
+        </div>
+
+        <div class="history-table-wrap">
+          <div class="hist-empty" id="histEmpty" style="display:none">
+            <p style="color:var(--text-tertiary)">No history entries yet</p>
+          </div>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th style="width:140px">Time</th>
+                <th style="width:100px">Type</th>
+                <th>Operation</th>
+                <th style="width:60px;text-align:center">Files</th>
+                <th style="width:80px"></th>
+              </tr>
+            </thead>
+            <tbody id="histTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB 5 – SETTINGS
+         ════════════════════════════════════ -->
+    <div class="tab-panel" data-panel="settings">
+      <div class="panel-header">
+        <h1 class="panel-title" data-i18n="set.title">Settings</h1>
+        <p class="panel-subtitle" data-i18n="set.subtitle">Configure LocalPrep</p>
+      </div>
+
+      <div class="settings-workspace">
+        <div class="settings-form">
+
+          <div class="settings-group">
+            <p class="settings-group-title">General</p>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="set.language">Language</span>
+              <select class="select" id="setLanguage">
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="set.suffix">Default suffix</span>
+              <input class="input" id="setSuffix" type="text" value="_converted">
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <p class="settings-group-title">Conversion</p>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="set.bitrate">Default bitrate</span>
+              <select class="select" id="setBitrate">
+                <option value="128k">128 kbps</option>
+                <option value="192k">192 kbps</option>
+                <option value="256k">256 kbps</option>
+                <option value="320k">320 kbps</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-group" id="shellExtGroup">
+            <p class="settings-group-title">System Integration</p>
+            <div class="settings-row">
+              <span class="settings-label">Windows Explorer context menu</span>
+              <span class="shellext-status" id="shellExtStatus">Checking…</span>
+            </div>
+            <p class="settings-hint">Adds "LocalPrep" to the right-click menu for audio files (.mp3, .flac, .wav, .ogg, .m4a). No admin rights required.</p>
+            <div class="settings-row" style="margin-top:8px;gap:8px">
+              <button class="btn btn-primary btn-sm" id="shellExtRegister">Register</button>
+              <button class="btn btn-ghost   btn-sm" id="shellExtUnregister">Remove</button>
+            </div>
+          </div>
+
+          <div class="settings-group" id="updaterGroup">
+            <p class="settings-group-title">Updates</p>
+            <div class="settings-row">
+              <span class="settings-label">Current version</span>
+              <span id="updaterCurrentVersion" style="font-size:13px;color:var(--text-secondary);font-family:var(--font-mono)">—</span>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">Last checked</span>
+              <span id="updaterLastCheck" style="font-size:12px;color:var(--text-tertiary)">Never</span>
+            </div>
+            <div class="settings-row" style="align-items:center;margin-top:2px">
+              <button class="btn btn-ghost btn-sm" id="updaterCheckBtn">Check for Updates</button>
+              <span class="updater-status" id="updaterStatus"></span>
+            </div>
+            <p class="settings-hint updater-portable-hint" id="updaterPortableHint" style="display:none">
+              Portable version — auto-update unavailable. Download updates manually from
+              <a class="credits-link" id="updaterGithubLink" href="#">GitHub</a>.
+            </p>
+            <p class="settings-hint updater-dev-hint" id="updaterDevHint" style="display:none">
+              Running in dev mode — auto-update inactive.
+            </p>
+          </div>
+
+          <div class="settings-group">
+            <p class="settings-group-title">Advanced</p>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="set.ffmpegPath">ffmpeg path</span>
+              <input class="input" id="setFfmpegPath" type="text" readonly style="color:var(--text-tertiary);font-size:11px;font-family:var(--font-mono)">
+            </div>
+            <p class="settings-hint">ffmpeg is bundled — no configuration needed.</p>
+          </div>
+
+          <div class="settings-group settings-credits">
+            <p class="settings-group-title">About</p>
+            <div class="credits-row">
+              <span class="credits-app-name">LocalPrep</span>
+              <span class="credits-version" id="creditsVersion">v0.1.0</span>
+            </div>
+            <div class="credits-row credits-author-row">
+              <span class="credits-label">Author</span>
+              <span class="credits-value">Yusuf &nbsp;<span class="credits-handle">@yyusvf</span></span>
+            </div>
+            <div class="credits-row">
+              <span class="credits-label">GitHub</span>
+              <a class="credits-link" id="creditsGithub" href="#">github.com/yyusvf/LocalPrep</a>
+            </div>
+          </div>
+
+          <div class="settings-footer">
+            <button class="btn btn-primary" id="setSaveBtn"  data-i18n="set.save">Save Settings</button>
+            <button class="btn btn-ghost"   id="setResetBtn" data-i18n="set.reset">Reset to Defaults</button>
+            <span class="settings-saved-msg" id="setSavedMsg" data-i18n="set.saved">Settings saved</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Hidden audio element -->
+<audio id="audioPlayer" preload="none"></audio>
+
+<!-- ── Scripts ──────────────────────────────────────────────────── -->
+<!-- Core -->
+<script src="js/icons.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/ipc.js"></script>
+<!-- Shared components -->
+<script src="js/components/context-menu.js"></script>
+<script src="js/components/file-table.js"></script>
+<script src="js/components/modal.js"></script>
+<!-- UI modules -->
+<script src="js/nav.js"></script>
+<script src="js/player.js"></script>
+<!-- Tab modules -->
+<script src="js/tabs/sample-rate.js"></script>
+<script src="js/tabs/format.js"></script>
+<script src="js/tabs/metadata.js"></script>
+<script src="js/tabs/history.js"></script>
+<script src="js/tabs/settings.js"></script>
+<!-- App entry -->
+<script src="js/app.js"></script>
+
+</body>
+</html>

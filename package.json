@@ -1,0 +1,58 @@
+{
+  "name": "localprep",
+  "productName": "LocalPrep",
+  "version": "0.1.0",
+  "description": "Local audio preparation tool — sample rate conversion, format conversion, and metadata editing",
+  "author": {
+    "name": "yyusvf",
+    "url": "https://github.com/yyusvf"
+  },
+  "homepage": "https://github.com/yyusvf/LocalPrep",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yyusvf/LocalPrep.git"
+  },
+  "license": "MIT",
+  "keywords": ["audio", "converter", "sample-rate", "metadata", "electron", "ffmpeg"],
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.3.0",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "music-metadata": "^7.14.0",
+    "node-id3": "^0.2.6"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.localprep.app",
+    "productName": "LocalPrep",
+    "directories": {
+      "output": "dist"
+    },
+    "asarUnpack": [
+      "**/ffmpeg-static/**",
+      "**/node_modules/ffmpeg-static/**"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "yyusvf",
+      "repo": "LocalPrep"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    }
+  }
+}

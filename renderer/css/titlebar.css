@@ -1,0 +1,62 @@
+/* ── Titlebar ────────────────────────────────────────────────────
+   Windows: full custom titlebar with window controls.
+   macOS:   just a drag region — traffic lights are native.
+   ──────────────────────────────────────────────────────────────── */
+.titlebar {
+  display: none;               /* hidden by default */
+  height: var(--titlebar-height);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+
+/* Windows — show with controls */
+.titlebar.is-windows {
+  display: flex;
+  align-items: center;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+}
+
+/* macOS — invisible drag strip only */
+.titlebar.is-darwin {
+  display: flex;
+  background: transparent;
+  pointer-events: none;
+  height: 36px;
+}
+
+/* Draggable region fills the bar */
+.titlebar-drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+/* Window control buttons (Windows only) */
+.titlebar-controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  color: var(--text-tertiary);
+  transition: background var(--ease-fast), color var(--ease-fast);
+  flex-shrink: 0;
+}
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.titlebar-btn--close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+.titlebar-btn svg { pointer-events: none; }
