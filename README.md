@@ -19,7 +19,7 @@ Desktop tool for preparing local audio files. Convert sample rates & formats, ed
 **Additional highlights**
 
 - Drag-and-drop folders directly onto the file list in any tab
-- Right-click any audio file or folder in Windows Explorer → **LocalPrep** submenu
+- Right-click any audio file or folder in Windows Explorer → **LocalPrep** context menu
 - Audio preview player with volume control
 - Sortable, resizable, reorderable columns (state persisted between sessions)
 - Single-instance: opening a second instance focuses the existing window
@@ -35,8 +35,7 @@ Desktop tool for preparing local audio files. Convert sample rates & formats, ed
 
 ## Requirements
 
-- **Windows** 10 / 11 (primary platform)
-- **macOS** 12+ (supported, no shell extension)
+- **Windows** 10 / 11
 - ffmpeg is bundled — no separate installation needed
 
 ---
