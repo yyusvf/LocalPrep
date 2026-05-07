@@ -30,7 +30,7 @@ jobs:
 
       # ── Dependencies ──────────────────────────────────────────────
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # ── Build & Publish ───────────────────────────────────────────
       # On a version tag:  electron-builder builds the NSIS installer
