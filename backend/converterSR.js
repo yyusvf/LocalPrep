@@ -38,22 +38,28 @@ async function convertSampleRate(files, options, onProgress, onLog) {
     log('info', `Processing: ${file.filename}`)
 
     const outputPath = _buildOutputPath(file.path, options)
-    const backupPath = options.overwrite ? file.path + '.undo_backup' : null
-
-    // When overwriting, ffmpeg can't write to the same path as input.
-    // Write to a temp file, then swap it in after success.
-    const tempPath = options.overwrite
+    // When overwriting, ffmpeg can't write to the same path as input —
+    // write to a temp file, then swap it in after success.
+    const tempPath   = options.overwrite
       ? outputPath + '.tmp_convert' + path.extname(file.path)
       : null
     const ffmpegDest = tempPath || outputPath
 
+    // backupPath is resolved inside the try so backup errors are caught per-file
+    let backupPath = null
+
     try {
-      // Backup original before overwrite
-      if (options.overwrite && backupPath) {
-        fs.copyFileSync(file.path, backupPath)
+      // Create backup before any write
+      if (options.overwrite) {
+        try {
+          backupPath = _backupPath(file.path, options.backupFolder)
+          fs.copyFileSync(file.path, backupPath)
+        } catch (err) {
+          throw new Error(`Backup failed — ${err.message}. Check Settings → Backup folder.`)
+        }
       }
 
-      await _runFfmpeg(file.path, ffmpegDest, options.targetSampleRate, (pct) => {
+      await _runFfmpeg(file.path, ffmpegDest, options.targetSampleRate, options.defaultBitrate, (pct) => {
         prog({ type: 'file', file: file.filename, percent: pct, current: i + 1, total: files.length })
       })
 
@@ -79,7 +85,7 @@ async function convertSampleRate(files, options, onProgress, onLog) {
       if (tempPath && fs.existsSync(tempPath)) {
         try { fs.unlinkSync(tempPath) } catch {}
       }
-      // Restore backup on error
+      // Restore backup on error (only if backup succeeded)
       if (backupPath && fs.existsSync(backupPath)) {
         try { fs.copyFileSync(backupPath, file.path); fs.unlinkSync(backupPath) } catch {}
       }
@@ -96,6 +102,16 @@ module.exports = { convertSampleRate, cancelConversion }
 
 // ── Private ────────────────────────────────────────────────────────
 
+function _backupPath(inputPath, backupFolder) {
+  const dir = backupFolder || path.dirname(inputPath)
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+  } catch (err) {
+    throw new Error(`Cannot create backup folder "${dir}": ${err.message}`)
+  }
+  return path.join(dir, path.basename(inputPath) + '_' + Date.now() + '.bak')
+}
+
 function _buildOutputPath(inputPath, options) {
   if (options.overwrite) return inputPath
   const dir    = options.outputFolder || path.dirname(inputPath)
@@ -105,15 +121,18 @@ function _buildOutputPath(inputPath, options) {
   return path.join(dir, `${base}${suffix}${ext}`)
 }
 
-function _runFfmpeg(input, output, sampleRate, onProgress) {
+function _runFfmpeg(input, output, sampleRate, defaultBitrate, onProgress) {
   return new Promise((resolve, reject) => {
     let duration = 0
 
     const isMP3 = path.extname(output).toLowerCase() === '.mp3'
+    const mp3Opts = isMP3
+      ? ['-c:a', 'libmp3lame', '-b:a', defaultBitrate || '320k', '-id3v2_version', '3', '-write_id3v1', '1']
+      : []
 
     const cmd = ffmpeg(input)
       .audioFrequency(sampleRate)
-      .outputOptions(isMP3 ? ['-id3v2_version 3', '-write_id3v1 1'] : [])
+      .outputOptions(mp3Opts)
       .on('codecData', d => {
         duration = _parseDuration(d.duration)
       })

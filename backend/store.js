@@ -1,4 +1,6 @@
 const Store = require('electron-store')
+const path  = require('path')
+const os    = require('os')
 
 const store = new Store({
   name: 'config',
@@ -6,6 +8,7 @@ const store = new Store({
     language: 'en',
     defaultSuffix: '_converted',
     defaultBitrate: '320k',
+    backupFolder: path.join(os.homedir(), 'LocalPrep', 'Backups'),
     metadataSortField: 'name',
     ffmpegPath: '',
     recentFolders: [],

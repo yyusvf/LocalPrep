@@ -77,6 +77,21 @@ function _propsHtml(p) {
 }
 
 /**
+ * Persist and broadcast the last successfully searched folder path.
+ * Sets the placeholder on all three tab folder inputs so users see it
+ * dimmed until they explicitly choose their own folder.
+ * Pass persist=false when restoring from store on startup.
+ */
+function _setLastFolder(path, persist = true) {
+  if (persist) window.api.store.set('lastFolder', path)
+  ;['srFolderPath', 'fmtFolderPath', 'metaFolderPath'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) { el.placeholder = path; el.dataset.lastPath = path }
+  })
+}
+window._setLastFolder = _setLastFolder
+
+/**
  * Attach folder drag-and-drop to an element.
  * Calls onFolders([path, ...]) with every dropped directory path.
  * Also shows a visual highlight (class "dz-active") while hovering.
@@ -246,6 +261,9 @@ async function init() {
   window.MetadataTab.init()
   window.HistoryTab.init()
   window.SettingsTab.init()
+
+  // Restore last-used folder path as placeholder in all three tabs
+  window.api.store.get('lastFolder').then(f => { if (f) _setLastFolder(f, false) })
 
   // Refresh history when switching to that tab
   document.querySelectorAll('.nav-item').forEach(item => {

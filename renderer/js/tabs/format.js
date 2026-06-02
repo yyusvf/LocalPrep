@@ -14,6 +14,7 @@ class FormatTab {
     this._bindEvents()
     this._listenConvertEvents()
     this._updateQualityOptions()
+    this._loadOutputSettings()
   }
 
   _bindElements() {
@@ -87,7 +88,16 @@ class FormatTab {
       }
     })
 
-    e.targetFormat.addEventListener('change', () => this._updateQualityOptions())
+    // Persist subfolders checkbox
+    window.api.store.get('fmt.subfolders').then(v => { if (v != null) e.subfolders.checked = v })
+    e.subfolders.addEventListener('change', () => { window.api.store.set('fmt.subfolders', e.subfolders.checked) })
+
+    // Source / target format — persist on change
+    e.sourceFormat.addEventListener('change', () => window.api.store.set('fmt.sourceFormat', e.sourceFormat.value))
+    e.targetFormat.addEventListener('change', () => {
+      window.api.store.set('fmt.targetFormat', e.targetFormat.value)
+      this._updateQualityOptions()
+    })
     e.searchBtn.addEventListener('click', () => this._search())
     e.filterInput.addEventListener('input', () => this.table.filter(e.filterInput.value))
     e.selectAll.addEventListener('click',   () => this.table.selectAll())
@@ -96,12 +106,19 @@ class FormatTab {
     e.outFolderBtn.addEventListener('click', async () => {
       try {
         const p = await window.api.dialog.openFolder()
-        if (p) e.outFolderPath.value = p
+        if (p) { e.outFolderPath.value = p; window.api.store.set('fmt.outFolder', p) }
       } catch (err) {
         _toast(`Could not open folder dialog: ${err.message}`, 'error')
       }
     })
-    e.outFolderClear.addEventListener('click', () => { e.outFolderPath.value = '' })
+    e.outFolderClear.addEventListener('click', () => {
+      e.outFolderPath.value = ''
+      window.api.store.set('fmt.outFolder', '')
+    })
+
+    // Persist output options on change
+    e.deleteOriginal.addEventListener('change', () => window.api.store.set('fmt.deleteOriginal', e.deleteOriginal.checked))
+    e.suffixInput.addEventListener('input', () => window.api.store.set('fmt.suffix', e.suffixInput.value))
 
     e.convertBtn.addEventListener('click', () => this._convert())
     e.cancelBtn.addEventListener('click',  () => window.api.convert.cancel('format'))
@@ -166,6 +183,11 @@ class FormatTab {
             <option value="256k">256 kbps</option>
             <option value="320k" selected>320 kbps</option>
           </select>`
+        // Pre-select bitrate from settings
+        window.api.store.get('defaultBitrate').then(br => {
+          const sel = w.querySelector('#fmtBitrate')
+          if (sel && br) sel.value = br
+        })
         break
       case 'flac':
         w.innerHTML = `
@@ -226,11 +248,12 @@ class FormatTab {
   }
 
   async _search() {
-    const folder     = this.el.folderPath.value.trim()
-    if (!folder)     { _toast('Choose a folder first'); return }
-    const sourceFmt  = this.el.sourceFormat.value
+    // Fall back to the last-used folder (shown dimly as placeholder)
+    const folder    = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
+    if (!folder)    { _toast('Choose a folder first'); return }
+    const sourceFmt = this.el.sourceFormat.value
 
-    this.el.searchBtn.disabled   = true
+    this.el.searchBtn.disabled    = true
     this.el.searchBtn.textContent = 'Scanning…'
 
     try {
@@ -248,10 +271,12 @@ class FormatTab {
       this.table.setData(filtered)
       this.el.statusBar.textContent = `${filtered.length} files found`
       if (!filtered.length) _toast('No matching files found')
+      // Broadcast this folder as the new shared last-folder
+      window._setLastFolder?.(folder)
     } catch (err) {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
-      this.el.searchBtn.disabled   = false
+      this.el.searchBtn.disabled    = false
       this.el.searchBtn.textContent = 'Search Files'
     }
   }
@@ -356,6 +381,27 @@ class FormatTab {
     } catch (err) {
       m.setContent(`<p style="color:var(--error)">Error: ${err.message}</p>`)
     }
+  }
+
+  // ── Restore persisted output options ─────────────────────────────
+  _loadOutputSettings() {
+    // Source / target format selects
+    window.api.store.get('fmt.sourceFormat').then(v => {
+      if (v != null) this.el.sourceFormat.value = v
+    })
+    window.api.store.get('fmt.targetFormat').then(v => {
+      if (v) { this.el.targetFormat.value = v; this._updateQualityOptions() }
+    })
+    // Output options
+    window.api.store.get('fmt.deleteOriginal').then(v => {
+      if (v != null) this.el.deleteOriginal.checked = v
+    })
+    window.api.store.get('fmt.suffix').then(v => {
+      if (v != null) this.el.suffixInput.value = v
+    })
+    window.api.store.get('fmt.outFolder').then(v => {
+      if (v) this.el.outFolderPath.value = v
+    })
   }
 
   async _openFile(filePath) {

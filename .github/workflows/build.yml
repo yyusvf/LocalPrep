@@ -56,10 +56,21 @@ jobs:
           # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # ── Upload artifacts (PR builds only) ────────────────────────
-      - name: Upload installer artifact
+      # On version-tag pushes electron-builder publishes directly to the
+      # GitHub Release (both the NSIS installer and the portable exe).
+      # On PRs we upload them as workflow artifacts for manual inspection.
+      - name: Upload installer artifact (PR only)
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: LocalPrep-installer-pr${{ github.event.pull_request.number }}
-          path: dist/*.exe
+          name: LocalPrep-Setup-pr${{ github.event.pull_request.number }}
+          path: dist/*Setup*.exe
+          retention-days: 7
+
+      - name: Upload portable artifact (PR only)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalPrep-Portable-pr${{ github.event.pull_request.number }}
+          path: dist/*Portable*.exe
           retention-days: 7

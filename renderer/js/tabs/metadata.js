@@ -101,6 +101,11 @@ class MetadataTab {
         _toast(`Could not open folder dialog: ${err.message}`, 'error')
       }
     })
+
+    // Persist subfolders checkbox
+    window.api.store.get('meta.subfolders').then(v => { if (v != null) e.subfolders.checked = v })
+    e.subfolders.addEventListener('change', () => { window.api.store.set('meta.subfolders', e.subfolders.checked) })
+
     e.searchBtn.addEventListener('click', () => this._search())
     e.filterInput.addEventListener('input', () => this.table.filter(e.filterInput.value))
     e.selectAll.addEventListener('click',   () => this.table.selectAll())
@@ -154,7 +159,8 @@ class MetadataTab {
 
   // ── Search ────────────────────────────────────────────────────────
   async _search() {
-    const folder = this.el.folderPath.value.trim()
+    // Fall back to the last-used folder (shown dimly as placeholder)
+    const folder = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
     if (!folder) { _toast('Choose a folder first'); return }
 
     this.el.searchBtn.disabled    = true
@@ -165,6 +171,8 @@ class MetadataTab {
       this.table.setData(files)
       this.el.statusBar.textContent = `${files.length} files found`
       this._clearEditor()
+      // Broadcast this folder as the new shared last-folder
+      window._setLastFolder?.(folder)
     } catch (err) {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
@@ -762,7 +770,7 @@ class MetadataTab {
       this.table.selectRow(filePath)
       // Load the file into the editor
       const file = this.files.find(f => f.path === filePath)
-      if (file) this._loadFile(file)
+      if (file) this._loadIntoEditor(file)
     } catch (err) {
       _toast(`Could not open file: ${err.message}`, 'error')
     }

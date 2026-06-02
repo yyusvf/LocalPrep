@@ -195,6 +195,9 @@ ipcMain.handle('shellext:unregister', async () => {
 
 // ── Sample Rate conversion ─────────────────────────────────────────
 ipcMain.handle('convert:sampleRate', async (event, files, options) => {
+  const store = require('./backend/store')
+  options.backupFolder   = store.get('backupFolder')
+  options.defaultBitrate = store.get('defaultBitrate') || '320k'
   const { convertSampleRate } = require('./backend/converterSR')
   return convertSampleRate(
     files, options,
@@ -205,12 +208,43 @@ ipcMain.handle('convert:sampleRate', async (event, files, options) => {
 
 // ── Format conversion ──────────────────────────────────────────────
 ipcMain.handle('convert:format', async (event, files, options) => {
+  const store = require('./backend/store')
+  options.backupFolder = store.get('backupFolder')
   const { convertFormat } = require('./backend/converterFormat')
   return convertFormat(
     files, options,
     (data) => event.sender.send('convert:progress', data),
     (msg)  => event.sender.send('convert:log',      msg)
   )
+})
+
+// ── Backup management ──────────────────────────────────────────────
+ipcMain.handle('backup:getInfo', () => {
+  const store  = require('./backend/store')
+  const folder = store.get('backupFolder')
+  let count = 0, size = 0
+  try {
+    const { readdirSync, statSync } = require('fs')
+    const files = readdirSync(folder).filter(f => f.endsWith('.bak'))
+    count = files.length
+    size  = files.reduce((acc, f) => {
+      try { return acc + statSync(require('path').join(folder, f)).size } catch { return acc }
+    }, 0)
+  } catch {}
+  return { count, size, folder }
+})
+ipcMain.handle('backup:deleteAll', () => {
+  const store  = require('./backend/store')
+  const folder = store.get('backupFolder')
+  let deleted = 0
+  try {
+    const { readdirSync, unlinkSync } = require('fs')
+    const p = require('path')
+    for (const f of readdirSync(folder).filter(f => f.endsWith('.bak'))) {
+      try { unlinkSync(p.join(folder, f)); deleted++ } catch {}
+    }
+  } catch {}
+  return deleted
 })
 
 // ── Cancel ─────────────────────────────────────────────────────────

@@ -65,11 +65,18 @@ async function convertFormat(files, options, onProgress, onLog) {
 
     const targetExt  = FORMAT_EXT[options.targetFormat.toLowerCase()] || options.targetFormat.toLowerCase()
     const outputPath = _buildOutputPath(file.path, targetExt, options)
-    const backupPath = options.deleteOriginal ? file.path + '.undo_backup' : null
+    // backupPath resolved inside try so backup errors are caught per-file
+    let backupPath = null
 
     try {
-      if (options.deleteOriginal && backupPath) {
-        fs.copyFileSync(file.path, backupPath)
+      // Create backup before any write
+      if (options.deleteOriginal) {
+        try {
+          backupPath = _backupPath(file.path, options.backupFolder)
+          fs.copyFileSync(file.path, backupPath)
+        } catch (err) {
+          throw new Error(`Backup failed — ${err.message}. Check Settings → Backup folder.`)
+        }
       }
 
       await _runConvert(file.path, outputPath, options, (pct) => {
@@ -93,6 +100,7 @@ async function convertFormat(files, options, onProgress, onLog) {
       successCount++
 
     } catch (err) {
+      // Restore backup on error (only if backup succeeded)
       if (backupPath && fs.existsSync(backupPath)) {
         try { fs.copyFileSync(backupPath, file.path); fs.unlinkSync(backupPath) } catch {}
       }
@@ -108,6 +116,16 @@ async function convertFormat(files, options, onProgress, onLog) {
 module.exports = { convertFormat, cancelConversion }
 
 // ── Private ────────────────────────────────────────────────────────
+
+function _backupPath(inputPath, backupFolder) {
+  const dir = backupFolder || path.dirname(inputPath)
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+  } catch (err) {
+    throw new Error(`Cannot create backup folder "${dir}": ${err.message}`)
+  }
+  return path.join(dir, path.basename(inputPath) + '_' + Date.now() + '.bak')
+}
 
 function _buildOutputPath(inputPath, targetExt, options) {
   const dir    = options.outputFolder || path.dirname(inputPath)

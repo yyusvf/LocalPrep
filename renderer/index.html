@@ -483,6 +483,26 @@
             </div>
           </div>
 
+          <div class="settings-group">
+            <p class="settings-group-title">Backups</p>
+            <div class="settings-row">
+              <span class="settings-label">Backup folder</span>
+              <div style="display:flex;gap:6px;flex:1">
+                <input class="input" id="setBackupFolder" type="text" style="flex:1;font-size:11px;font-family:var(--font-mono)">
+                <button class="btn btn-ghost btn-sm" id="setBackupFolderBtn">…</button>
+                <button class="btn btn-ghost btn-sm" id="setBackupFolderReset" title="Reset to default">↺</button>
+              </div>
+            </div>
+            <div class="settings-row" style="align-items:center">
+              <span class="settings-label">Stored backups</span>
+              <span id="backupInfo" style="font-size:12px;color:var(--text-tertiary)">—</span>
+            </div>
+            <div class="settings-row" style="margin-top:2px">
+              <button class="btn btn-ghost btn-sm" id="backupDeleteBtn" style="color:var(--error)">Delete All Backups</button>
+              <span class="settings-hint" style="margin-top:0">Deletes stored undo files. Undo in History will no longer work for past operations.</span>
+            </div>
+          </div>
+
           <div class="settings-group" id="shellExtGroup">
             <p class="settings-group-title">System Integration</p>
             <div class="settings-row">

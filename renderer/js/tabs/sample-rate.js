@@ -96,13 +96,25 @@ class SampleRateTab {
       }
     })
 
-    // Custom sample rate inputs
+    // Persist subfolders checkbox
+    window.api.store.get('sr.subfolders').then(v => {
+      if (v != null) e.subfolders.checked = v
+    })
+    e.subfolders.addEventListener('change', () => {
+      window.api.store.set('sr.subfolders', e.subfolders.checked)
+    })
+
+    // Custom sample rate inputs — show/hide custom field + persist selection
     e.sourceRate.addEventListener('change', () => {
       e.sourceCustom.style.display = e.sourceRate.value === 'custom' ? '' : 'none'
+      window.api.store.set('sr.sourceRate', e.sourceRate.value)
     })
     e.targetRate.addEventListener('change', () => {
       e.targetCustom.style.display = e.targetRate.value === 'custom' ? '' : 'none'
+      window.api.store.set('sr.targetRate', e.targetRate.value)
     })
+    e.sourceCustom.addEventListener('input', () => window.api.store.set('sr.sourceCustom', e.sourceCustom.value))
+    e.targetCustom.addEventListener('input', () => window.api.store.set('sr.targetCustom', e.targetCustom.value))
 
     // Search
     e.searchBtn.addEventListener('click', () => this._search())
@@ -115,20 +127,25 @@ class SampleRateTab {
     e.selectAll.addEventListener('click',   () => this.table.selectAll())
     e.deselectAll.addEventListener('click', () => this.table.deselectAll())
 
-    // Output mode
-    e.overwrite.addEventListener('change', () => this._updateOutputState())
-    e.newFile.addEventListener('change',   () => this._updateOutputState())
-    e.suffixCheck.addEventListener('change',() => { e.suffixInput.disabled = !e.suffixCheck.checked })
+    // Output mode — persist on every change
+    e.overwrite.addEventListener('change', () => { window.api.store.set('sr.outputMode', 'overwrite'); this._updateOutputState() })
+    e.newFile.addEventListener('change',   () => { window.api.store.set('sr.outputMode', 'newFile');   this._updateOutputState() })
+    e.suffixCheck.addEventListener('change', () => {
+      e.suffixInput.disabled = !e.suffixCheck.checked
+      window.api.store.set('sr.useSuffix', e.suffixCheck.checked)
+    })
+    e.suffixInput.addEventListener('input', () => window.api.store.set('sr.suffix', e.suffixInput.value))
     e.outFolderBtn.addEventListener('click', async () => {
       try {
         const p = await window.api.dialog.openFolder()
-        if (p) { e.outFolderPath.value = p; this._updateOutputState() }
+        if (p) { e.outFolderPath.value = p; window.api.store.set('sr.outFolder', p); this._updateOutputState() }
       } catch (err) {
         _toast(`Could not open folder dialog: ${err.message}`, 'error')
       }
     })
     e.outFolderClear.addEventListener('click', () => {
       e.outFolderPath.value = ''
+      window.api.store.set('sr.outFolder', '')
       this._updateOutputState()
     })
 
@@ -160,6 +177,8 @@ class SampleRateTab {
     _enableFolderDrop(e.tableWrap, async dirs => {
       const sourceRate = e.sourceRate.value === 'custom'
         ? parseInt(e.sourceCustom.value, 10) : (e.sourceRate.value || null)
+      const targetRate = e.targetRate.value === 'custom'
+        ? parseInt(e.targetCustom.value, 10) : parseInt(e.targetRate.value, 10)
       const seen  = new Set(this.files.map(f => f.path))
       let added = 0
       for (const dir of dirs) {
@@ -168,7 +187,11 @@ class SampleRateTab {
             recursive:        e.subfolders.checked,
             sourceSampleRate: sourceRate || null,
           })
-          const fresh = found.filter(f => !seen.has(f.path))
+          const fresh = found.filter(f => {
+            if (seen.has(f.path)) return false
+            if (targetRate && f.sampleRate === targetRate) return false  // already at target rate
+            return true
+          })
           fresh.forEach(f => seen.add(f.path))
           this.files.push(...fresh)
           added += fresh.length
@@ -184,7 +207,8 @@ class SampleRateTab {
 
   // ── Search ────────────────────────────────────────────────────────
   async _search() {
-    const folder = this.el.folderPath.value.trim()
+    // Fall back to the last-used folder (shown dimly as placeholder)
+    const folder = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
     if (!folder) { _toast('Choose a folder first'); return }
 
     this.el.searchBtn.disabled = true
@@ -194,15 +218,23 @@ class SampleRateTab {
       ? parseInt(this.el.sourceCustom.value, 10)
       : (this.el.sourceRate.value || null)
 
+    const targetRate = this.el.targetRate.value === 'custom'
+      ? parseInt(this.el.targetCustom.value, 10)
+      : parseInt(this.el.targetRate.value, 10)
+
     try {
-      const files = await window.api.files.scan(folder, {
+      const raw = await window.api.files.scan(folder, {
         recursive:        this.el.subfolders.checked,
         sourceSampleRate: sourceRate || null,
       })
+      // Exclude files that already have the target sample rate
+      const files = targetRate ? raw.filter(f => f.sampleRate !== targetRate) : raw
       this.files = files
       this.table.setData(files)
       this.el.statusBar.textContent = `${files.length} files found`
       if (!files.length) _toast('No matching files found')
+      // Broadcast this folder as the new shared last-folder
+      window._setLastFolder?.(folder)
     } catch (err) {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
@@ -360,8 +392,29 @@ class SampleRateTab {
   }
 
   _loadSettings() {
-    window.api.store.get('defaultSuffix').then(s => {
-      if (s) this.el.suffixInput.value = s
+    // Restore source / target rate selects
+    window.api.store.get('sr.sourceRate').then(v => {
+      if (v) { this.el.sourceRate.value = v; if (v === 'custom') this.el.sourceCustom.style.display = '' }
+    })
+    window.api.store.get('sr.targetRate').then(v => {
+      if (v) { this.el.targetRate.value = v; if (v === 'custom') this.el.targetCustom.style.display = '' }
+    })
+    window.api.store.get('sr.sourceCustom').then(v => { if (v) this.el.sourceCustom.value = v })
+    window.api.store.get('sr.targetCustom').then(v => { if (v) this.el.targetCustom.value = v })
+    // Restore output mode
+    window.api.store.get('sr.outputMode').then(v => {
+      if (v === 'overwrite') { this.el.overwrite.checked = true; this._updateOutputState() }
+    })
+    // Restore suffix checkbox + value
+    window.api.store.get('sr.useSuffix').then(v => {
+      if (v != null) { this.el.suffixCheck.checked = v; this.el.suffixInput.disabled = !v }
+    })
+    window.api.store.get('sr.suffix').then(v => {
+      if (v != null) this.el.suffixInput.value = v
+    })
+    // Restore output folder
+    window.api.store.get('sr.outFolder').then(v => {
+      if (v) { this.el.outFolderPath.value = v; this._updateOutputState() }
     })
   }
 

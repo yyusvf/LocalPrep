@@ -59,6 +59,12 @@ contextBridge.exposeInMainWorld('api', {
   // ── CLI open event ────────────────────────────────────────────
   onCliOpen: (cb) => ipcRenderer.on('cli:open', (_, data) => cb(data)),
 
+  // ── Backup management ─────────────────────────────────────────
+  backup: {
+    getInfo:   () => ipcRenderer.invoke('backup:getInfo'),
+    deleteAll: () => ipcRenderer.invoke('backup:deleteAll'),
+  },
+
   // ── Auto-updater ──────────────────────────────────────────────
   updater: {
     check:          ()    => ipcRenderer.invoke('updater:check'),

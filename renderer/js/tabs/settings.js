@@ -29,6 +29,65 @@ class SettingsTab {
 
     // Auto-updater section
     this._initUpdater()
+
+    // Backup section
+    this._initBackup()
+  }
+
+  _initBackup() {
+    const folderInput  = document.getElementById('setBackupFolder')
+    const browseBtn    = document.getElementById('setBackupFolderBtn')
+    const resetBtn     = document.getElementById('setBackupFolderReset')
+    const infoEl       = document.getElementById('backupInfo')
+    const deleteBtn    = document.getElementById('backupDeleteBtn')
+
+    const refreshInfo = async () => {
+      if (!infoEl) return
+      try {
+        const { count, size } = await window.api.backup.getInfo()
+        infoEl.textContent = count > 0
+          ? `${count} file${count !== 1 ? 's' : ''}, ${_fmtSize(size)}`
+          : 'No backups stored'
+      } catch { infoEl.textContent = '—' }
+    }
+
+    // Load current folder
+    window.api.store.get('backupFolder').then(f => {
+      if (f && folderInput) folderInput.value = f
+    })
+    refreshInfo()
+
+    // Save on input change
+    folderInput?.addEventListener('change', () => {
+      window.api.store.set('backupFolder', folderInput.value)
+    })
+
+    // Browse
+    browseBtn?.addEventListener('click', async () => {
+      const p = await window.api.dialog.openFolder()
+      if (p) { folderInput.value = p; window.api.store.set('backupFolder', p) }
+    })
+
+    // Reset to default
+    resetBtn?.addEventListener('click', async () => {
+      await window.api.store.set('backupFolder', null)   // clears → store returns default
+      const { folder } = await window.api.backup.getInfo()
+      if (folderInput) folderInput.value = folder
+    })
+
+    // Delete all
+    deleteBtn?.addEventListener('click', async () => {
+      const { count } = await window.api.backup.getInfo()
+      if (count === 0) { _toast('No backups to delete'); return }
+      const ok = await Modal.confirm(
+        `Delete ${count} backup file${count !== 1 ? 's' : ''}?<br>Undo in History will stop working for past operations.`,
+        { title: 'Delete all backups', confirmLabel: 'Delete', danger: true }
+      )
+      if (!ok) return
+      const deleted = await window.api.backup.deleteAll()
+      _toast(`Deleted ${deleted} backup${deleted !== 1 ? 's' : ''}`)
+      refreshInfo()
+    })
   }
 
   _initUpdater() {
