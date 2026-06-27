@@ -223,6 +223,9 @@ async function init() {
     window.api.window.isMaximized().then(isMax => { if (isMax) btnMax.innerHTML = ICONS.winRestore })
   } else if (platform === 'darwin') {
     titlebar.classList.add('is-darwin')
+    // Native macOS traffic lights replace our custom window buttons
+    const controls = titlebar.querySelector('.titlebar-controls')
+    if (controls) controls.style.display = 'none'
   }
 
   // Core modules

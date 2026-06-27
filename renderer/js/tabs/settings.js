@@ -115,12 +115,17 @@ class SettingsTab {
       if (ts && lastCheckEl) lastCheckEl.textContent = new Date(ts).toLocaleString()
     }).catch(() => {})
 
-    // Detect portable / dev mode
+    // Detect portable / dev / unsigned Mac
     Promise.all([
       window.api.updater.isPortable(),
       window.api.updater.isPackaged(),
-    ]).then(([portable, packaged]) => {
-      if (portable) {
+      window.api.updater.isMac(),
+    ]).then(([portable, packaged, mac]) => {
+      if (mac) {
+        if (portableEl)  portableEl.style.display  = ''
+        if (checkBtn)    checkBtn.disabled           = true
+        if (statusEl)    statusEl.textContent        = 'macOS — download updates from GitHub'
+      } else if (portable) {
         if (portableEl)  portableEl.style.display  = ''
         if (checkBtn)    checkBtn.disabled           = true
         if (statusEl)    statusEl.textContent        = 'Portable — manual updates only'

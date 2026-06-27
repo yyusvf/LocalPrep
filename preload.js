@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld('api', {
     install:        ()    => ipcRenderer.invoke('updater:install'),
     isPortable:     ()    => ipcRenderer.invoke('updater:isPortable'),
     isPackaged:     ()    => ipcRenderer.invoke('updater:isPackaged'),
+    isMac:          ()    => ipcRenderer.invoke('updater:isMac'),
     onAvailable:    (cb)  => ipcRenderer.on('updater:available',     (_, d) => cb(d)),
     onNotAvailable: (cb)  => ipcRenderer.on('updater:not-available', ()    => cb()),
     onDownloaded:   (cb)  => ipcRenderer.on('updater:downloaded',    (_, d) => cb(d)),

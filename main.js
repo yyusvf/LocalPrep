@@ -88,11 +88,12 @@ function _setupAutoUpdater() {
   // These are always available so the renderer can query the mode
   ipcMain.handle('updater:isPortable', () => IS_PORTABLE)
   ipcMain.handle('updater:isPackaged', () => app.isPackaged)
+  ipcMain.handle('updater:isMac',      () => isDarwin)
 
   const send = (ch, data) => { if (mainWindow?.webContents) mainWindow.webContents.send(ch, data) }
 
-  if (!app.isPackaged || IS_PORTABLE) {
-    // Dev mode or portable — stub the action channels so invoke() doesn't throw
+  if (!app.isPackaged || IS_PORTABLE || isDarwin) {
+    // Dev, portable, or unsigned macOS build — stub the action channels so invoke() doesn't throw
     ipcMain.handle('updater:check',   () => null)
     ipcMain.handle('updater:install', () => null)
     return
