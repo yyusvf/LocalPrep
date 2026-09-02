@@ -5,6 +5,21 @@ const NodeID3 = require('node-id3')
 const { ffmpegPath } = require('./ffmpeg')
 const { spawn }      = require('child_process')
 
+/**
+ * Undo backups belong in the configured backup folder, never next to the
+ * user's music. The original path is recorded in the history entry, which is
+ * what the undo restores to.
+ */
+function _backupPath(filePath) {
+  const dir = require('./store').get('backupFolder') || path.dirname(filePath)
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+  } catch (err) {
+    throw new Error(`Cannot create backup folder "${dir}": ${err.message}`)
+  }
+  return path.join(dir, path.basename(filePath) + '_' + Date.now() + '.bak')
+}
+
 // ── Public API ────────────────────────────────────────────────────
 
 /**
@@ -18,7 +33,7 @@ const { spawn }      = require('child_process')
  */
 async function writeTags(filePath, tags, coverPath = null) {
   const ext        = path.extname(filePath).toLowerCase()
-  const backupPath = filePath + '.undo_backup'
+  const backupPath = _backupPath(filePath)
 
   // If coverPath is a URL, download it to a temp file first
   let tempCoverPath = null
@@ -84,7 +99,7 @@ async function applyTrackNumbers(assignments) {
   const historyFiles = []
   for (const a of assignments) {
     const ext        = path.extname(a.path).toLowerCase()
-    const backupPath = a.path + '.undo_backup'
+    const backupPath = _backupPath(a.path)
     try {
       fs.copyFileSync(a.path, backupPath)
       if (ext === '.mp3' || ext === '.wav') {
@@ -211,9 +226,13 @@ async function _writeFfmpeg(filePath, tags, coverPath, ext) {
 
   args.push('-map', '0:a')
   if (hasCover) {
+    // A new cover was picked — take it from the second input
     args.push('-map', '1:v', '-c:v', 'copy', '-disposition:v:0', 'attached_pic')
   } else if (coverPath === '') {
-    // Remove cover — map only audio
+    // Explicit removal — map only audio, so nothing is carried over
+  } else {
+    // No cover change requested: carry the existing one over, or it is lost
+    args.push('-map', '0:v?', '-c:v', 'copy', '-disposition:v:0', 'attached_pic')
   }
 
   args.push('-c:a', 'copy')

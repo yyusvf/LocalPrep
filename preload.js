@@ -67,8 +67,14 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Auto-updater ──────────────────────────────────────────────
   updater: {
-    check:          ()    => ipcRenderer.invoke('updater:check'),
+    // manual=true means the user pressed the button — it must not consume
+    // the daily background-check window
+    check:          (manual = true) => ipcRenderer.invoke('updater:check', manual),
     install:        ()    => ipcRenderer.invoke('updater:install'),
+    accept:         ()    => ipcRenderer.invoke('updater:accept'),
+    skip:           (v)   => ipcRenderer.invoke('updater:skip', v),
+    onUpdated:      (cb)  => ipcRenderer.on('updater:updated',       (_, d) => cb(d)),
+    onDownloading:  (cb)  => ipcRenderer.on('updater:downloading',   (_, d) => cb(d)),
     isPortable:     ()    => ipcRenderer.invoke('updater:isPortable'),
     isPackaged:     ()    => ipcRenderer.invoke('updater:isPackaged'),
     isMac:          ()    => ipcRenderer.invoke('updater:isMac'),

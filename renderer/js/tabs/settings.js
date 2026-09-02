@@ -40,6 +40,18 @@ class SettingsTab {
     const resetBtn     = document.getElementById('setBackupFolderReset')
     const infoEl       = document.getElementById('backupInfo')
     const deleteBtn    = document.getElementById('backupDeleteBtn')
+    const retentionSel = document.getElementById('setBackupRetention')
+
+    // Automatic cleanup — applied at the next app start
+    window.api.store.get('backupRetention').then(v => {
+      if (retentionSel) retentionSel.value = String(v || 'never')
+    })
+    retentionSel?.addEventListener('change', () => {
+      window.api.store.set('backupRetention', retentionSel.value)
+      _toast(retentionSel.value === 'never'
+        ? 'Backups are kept indefinitely'
+        : `Backups older than ${retentionSel.value} days are removed at startup`)
+    })
 
     const refreshInfo = async () => {
       if (!infoEl) return
@@ -85,8 +97,10 @@ class SettingsTab {
       )
       if (!ok) return
       const deleted = await window.api.backup.deleteAll()
-      _toast(`Deleted ${deleted} backup${deleted !== 1 ? 's' : ''}`)
+      _toast(`Deleted ${deleted} backup${deleted !== 1 ? 's' : ''} — those operations can no longer be undone`)
       refreshInfo()
+      // History rows must immediately show their Undo button as disabled
+      window.HistoryTab?.refresh?.()
     })
   }
 
@@ -98,6 +112,26 @@ class SettingsTab {
     const devEl       = document.getElementById('updaterDevHint')
     const versionEl   = document.getElementById('updaterCurrentVersion')
     const githubLink  = document.getElementById('updaterGithubLink')
+    const behaviorSel = document.getElementById('setUpdateBehavior')
+    const behaviorRow = document.getElementById('updaterBehaviorRow')
+
+    // Update behaviour — 'ask' is the default: an app that silently replaces
+    // itself on first launch surprises people.
+    const _applyBehavior = v => {
+      // "Never" promises no network request at all, so the manual button goes too
+      if (checkBtn && !checkBtn.dataset.forcedOff) checkBtn.disabled = v === 'never'
+      if (statusEl && v === 'never') statusEl.textContent = 'Checking is turned off'
+    }
+    window.api.store.get('updateBehavior').then(v => {
+      const val = v || 'ask'
+      if (behaviorSel) behaviorSel.value = val
+      _applyBehavior(val)
+    })
+    behaviorSel?.addEventListener('change', () => {
+      window.api.store.set('updateBehavior', behaviorSel.value)
+      if (statusEl) { statusEl.textContent = ''; delete statusEl.dataset.state }
+      _applyBehavior(behaviorSel.value)
+    })
 
     // Show current version
     window.api.getVersion?.().then(v => {
@@ -121,26 +155,26 @@ class SettingsTab {
       window.api.updater.isPackaged(),
       window.api.updater.isMac(),
     ]).then(([portable, packaged, mac]) => {
-      if (mac) {
-        if (portableEl)  portableEl.style.display  = ''
-        if (checkBtn)    checkBtn.disabled           = true
-        if (statusEl)    statusEl.textContent        = 'macOS — download updates from GitHub'
-      } else if (portable) {
-        if (portableEl)  portableEl.style.display  = ''
-        if (checkBtn)    checkBtn.disabled           = true
-        if (statusEl)    statusEl.textContent        = 'Portable — manual updates only'
-      } else if (!packaged) {
-        if (devEl)       devEl.style.display        = ''
-        if (checkBtn)    checkBtn.disabled           = true
-        if (statusEl)    statusEl.textContent        = 'Dev mode'
+      // In every one of these modes the app cannot replace itself, so hide the
+      // behaviour options entirely rather than offering something that can't happen
+      const off = (msg, hintEl) => {
+        if (hintEl)      hintEl.style.display     = ''
+        if (behaviorRow) behaviorRow.style.display = 'none'
+        if (checkBtn)  { checkBtn.disabled = true; checkBtn.dataset.forcedOff = '1' }
+        if (statusEl)    statusEl.textContent     = msg
       }
+      if      (mac)       off('macOS — download updates from GitHub', portableEl)
+      else if (portable)  off('Portable — manual updates only',       portableEl)
+      else if (!packaged) off('Dev mode',                             devEl)
     }).catch(() => {})
 
-    // Helper: persist + show last check time
-    const _saveLastCheck = () => {
-      const now = new Date()
-      window.api.store.set('lastUpdateCheck', now.toISOString())
-      if (lastCheckEl) lastCheckEl.textContent = now.toLocaleString()
+    // Only the background check writes lastUpdateCheck. If a manual check
+    // stamped it too, it would consume the daily window and the automatic
+    // check would never fire again. The UI just reads the stored value back.
+    const _refreshLastCheck = () => {
+      window.api.store.get('lastUpdateCheck').then(ts => {
+        if (lastCheckEl) lastCheckEl.textContent = ts ? new Date(ts).toLocaleString() : 'Never'
+      }).catch(() => {})
     }
 
     // Listen for global updater events dispatched by app.js
@@ -159,7 +193,7 @@ class SettingsTab {
         case 'not-available':
           statusEl.textContent = 'Up to date ✓'
           statusEl.dataset.state = 'ok'
-          _saveLastCheck()
+          _refreshLastCheck()
           break
         case 'error':
           statusEl.textContent = `Error: ${msg}`
@@ -175,8 +209,22 @@ class SettingsTab {
       checkBtn.textContent = 'Checking…'
       if (statusEl) { statusEl.textContent = ''; delete statusEl.dataset.state }
       try {
-        await window.api.updater.check()
-        _saveLastCheck()
+        // manual = true → does not consume the daily background window
+        const r = await window.api.updater.check(true)
+        const msg = {
+          'off':        'Checking is turned off',
+          'up-to-date': 'Up to date ✓',
+          'available':  r?.version ? `v${r.version} available` : 'Update available',
+          'installing': `Installing v${r?.version ?? ''}…`,
+          'skipped':    r?.version ? `v${r.version} available` : 'Update available',
+          'error':      `Error: ${r?.reason ?? 'could not reach GitHub'}`,
+        }[r?.status]
+        if (statusEl && msg) {
+          statusEl.textContent   = msg
+          statusEl.dataset.state = r.status === 'error' ? 'error'
+                                 : r.status === 'up-to-date' ? 'ok' : 'available'
+        }
+        _refreshLastCheck()
       } catch (err) {
         if (statusEl) { statusEl.textContent = `Error: ${err.message}`; statusEl.dataset.state = 'error' }
       } finally {

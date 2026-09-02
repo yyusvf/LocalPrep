@@ -20,18 +20,19 @@
 </head>
 <body>
 
-<!-- ── Titlebar ──────────────────────────────────────────────────── -->
-<div id="titlebar" class="titlebar">
-  <div class="titlebar-drag"></div>
-  <div class="titlebar-controls">
-    <button class="titlebar-btn" id="btnMinimize" title="Minimize"></button>
-    <button class="titlebar-btn" id="btnMaximize" title="Maximize"></button>
-    <button class="titlebar-btn titlebar-btn--close" id="btnClose" title="Close"></button>
-  </div>
-</div>
-
 <!-- ── App Shell ─────────────────────────────────────────────────── -->
 <div class="app-shell">
+
+  <!-- Window controls — no separate title bar. The buttons overlay the
+       top-right corner, level with the logo; the empty space drags. -->
+  <div id="titlebar" class="titlebar">
+    <div class="titlebar-drag"></div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btnMinimize" title="Minimize"></button>
+      <button class="titlebar-btn" id="btnMaximize" title="Maximize"></button>
+      <button class="titlebar-btn titlebar-btn--close" id="btnClose" title="Close"></button>
+    </div>
+  </div>
 
   <!-- ── Sidebar ─────────────────────────────────────────────────── -->
   <aside class="sidebar">
@@ -493,6 +494,15 @@
                 <button class="btn btn-ghost btn-sm" id="setBackupFolderReset" title="Reset to default">↺</button>
               </div>
             </div>
+            <div class="settings-row">
+              <span class="settings-label">Delete automatically</span>
+              <select class="select" id="setBackupRetention">
+                <option value="never">Never</option>
+                <option value="7">After 7 days</option>
+                <option value="30">After 30 days</option>
+              </select>
+            </div>
+            <p class="settings-hint">Runs at startup. Older backups are removed and the matching History entries can no longer be undone.</p>
             <div class="settings-row" style="align-items:center">
               <span class="settings-label">Stored backups</span>
               <span id="backupInfo" style="font-size:12px;color:var(--text-tertiary)">—</span>
@@ -521,6 +531,14 @@
             <div class="settings-row">
               <span class="settings-label">Current version</span>
               <span id="updaterCurrentVersion" style="font-size:13px;color:var(--text-secondary);font-family:var(--font-mono)">—</span>
+            </div>
+            <div class="settings-row" id="updaterBehaviorRow">
+              <span class="settings-label">When an update is found</span>
+              <select class="select" id="setUpdateBehavior">
+                <option value="auto">Install automatically</option>
+                <option value="ask">Ask me first</option>
+                <option value="never">Never check</option>
+              </select>
             </div>
             <div class="settings-row">
               <span class="settings-label">Last checked</span>

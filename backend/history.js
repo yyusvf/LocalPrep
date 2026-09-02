@@ -10,7 +10,33 @@ const MAX_ENTRIES = 200
 
 function getHistory(type = null) {
   const all = store().get('history') || []
-  return type ? all.filter(h => h.type === type) : all
+  const list = type ? all.filter(h => h.type === type) : all
+  // canUndo is derived, never stored: a backup can vanish at any time
+  // (retention cleanup, "Delete All Backups", or the user deleting it by hand)
+  return list.map(h => ({ ...h, canUndo: _canUndo(h) }))
+}
+
+/** True while at least one backup of the entry still exists on disk. */
+function _canUndo(entry) {
+  return (entry.files || []).some(f => f.backupPath && fs.existsSync(f.backupPath))
+}
+
+/**
+ * Forget the given backup paths across all history entries.
+ * Called after backups are deleted so Undo does not offer a dead restore.
+ * @param {string[]} paths
+ */
+function forgetBackups(paths) {
+  const gone    = new Set(paths)
+  const history = store().get('history') || []
+  let touched = false
+  for (const entry of history) {
+    for (const f of entry.files || []) {
+      if (f.backupPath && gone.has(f.backupPath)) { f.backupPath = null; touched = true }
+    }
+  }
+  if (touched) store().set('history', history)
+  return touched
 }
 
 /**
@@ -45,6 +71,9 @@ function undoEntry(id) {
   if (idx === -1) throw new Error('Entry not found')
 
   const entry = history[idx]
+  if (!_canUndo(entry)) {
+    throw new Error('No backup left for this operation — it was deleted or has expired')
+  }
   let restored = 0, failed = 0
 
   for (const f of entry.files) {
@@ -82,4 +111,4 @@ function clearHistory(type = null) {
   store().set('history', filtered)
 }
 
-module.exports = { getHistory, addEntry, undoEntry, clearHistory }
+module.exports = { getHistory, addEntry, undoEntry, clearHistory, forgetBackups }

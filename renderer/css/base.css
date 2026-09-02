@@ -69,4 +69,5 @@ input:focus, select:focus { border-color: var(--accent); }
   min-height: 0;
   display: flex;
   overflow: hidden;
+  position: relative;   /* positioning context for the window-control overlay */
 }

@@ -44,11 +44,13 @@ class HistoryTab {
         <td style="color:var(--text-secondary);font-size:12px">${entry.description}</td>
         <td style="color:var(--text-tertiary);font-size:11px;text-align:center">${entry.fileCount}</td>
         <td style="text-align:right">
-          <button class="btn btn-secondary btn-xs undo-btn" data-id="${entry.id}">↩ Undo</button>
+          <button class="btn btn-secondary btn-xs undo-btn" data-id="${entry.id}"
+                  ${entry.canUndo ? '' : 'disabled title="Backup deleted or expired — nothing left to restore"'}>↩ Undo</button>
         </td>
       `
 
       tr.querySelector('.undo-btn').addEventListener('click', async () => {
+        if (!entry.canUndo) { _toast('No backup left for this operation', 'error'); return }
         const ok = await Modal.confirm(
           `Undo: <strong>${entry.description}</strong>?<br>This will restore ${entry.fileCount} file(s).`,
           { title: 'Undo Operation', confirmLabel: 'Undo' }

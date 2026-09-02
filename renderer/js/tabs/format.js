@@ -212,9 +212,9 @@ class FormatTab {
           <select class="select" id="fmtAacBitrate">
             <option value="128k">128 kbps</option>
             <option value="192k">192 kbps</option>
-            <option value="256k">256 kbps</option>
-            <option value="320k" selected>320 kbps</option>
-          </select>`
+            <option value="256k" selected>256 kbps</option>
+          </select>
+          <p class="settings-hint" style="margin-top:4px">ffmpeg's AAC encoder tops out near 256 kbps — higher settings are clamped.</p>`
         break
       case 'wav':
       case 'aiff':

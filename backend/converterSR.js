@@ -1,6 +1,7 @@
 const fs   = require('fs')
 const path = require('path')
-const { ffmpeg, ffmpegPath } = require('./ffmpeg')
+const { ffmpeg, ffmpegPath, probe } = require('./ffmpeg')
+const { metadataOpts } = require('./ffmpegOpts')
 
 let _activeCmd = null   // fluent-ffmpeg instance for cancel
 
@@ -28,6 +29,7 @@ function cancelConversion() {
 async function convertSampleRate(files, options, onProgress, onLog) {
   _activeCmd = null
   const historyFiles = []
+  const results      = []   // per-file readback so the renderer can refresh the table
   let successCount = 0, errorCount = 0
 
   const log = (level, text) => onLog({ tab: 'sample-rate', level, text })
@@ -47,6 +49,8 @@ async function convertSampleRate(files, options, onProgress, onLog) {
 
     // backupPath is resolved inside the try so backup errors are caught per-file
     let backupPath = null
+    // Remember whether the source had a cover, so a loss can be reported
+    const hadCover = (await probe(file.path))?.hasCover ?? false
 
     try {
       // Create backup before any write
@@ -59,9 +63,11 @@ async function convertSampleRate(files, options, onProgress, onLog) {
         }
       }
 
-      await _runFfmpeg(file.path, ffmpegDest, options.targetSampleRate, options.defaultBitrate, (pct) => {
-        prog({ type: 'file', file: file.filename, percent: pct, current: i + 1, total: files.length })
-      })
+      await _runFfmpeg(
+        file.path, ffmpegDest, options.targetSampleRate, options.defaultBitrate,
+        (pct) => prog({ type: 'file', file: file.filename, percent: pct, current: i + 1, total: files.length }),
+        (cmdline) => log('info', `  ffmpeg: ${cmdline}`)
+      )
 
       // Swap temp → original
       if (tempPath) {
@@ -71,8 +77,29 @@ async function convertSampleRate(files, options, onProgress, onLog) {
 
       prog({ type: 'file',    file: file.filename, percent: 100, current: i + 1, total: files.length })
       prog({ type: 'overall', percent: Math.round(((i + 1) / files.length) * 100) })
+
+      // ── Verify what actually landed on disk ──────────────────────
+      const actual = await probe(outputPath)
+      if (actual) {
+        const kbps = actual.bitrate ? `${Math.round(actual.bitrate / 1000)} kbps` : 'n/a'
+        log('info', `  → ${actual.sampleRate ?? '?'} Hz, ${kbps}${actual.hasCover ? ', cover kept' : ''}`)
+        if (actual.sampleRate && actual.sampleRate !== options.targetSampleRate) {
+          log('error', `✗  ${file.filename}: sample rate is ${actual.sampleRate} Hz, expected ${options.targetSampleRate} Hz`)
+        }
+        if (hadCover && !actual.hasCover) {
+          // Sample-rate conversion keeps the container, so a lost cover is always a defect
+          log('error', `✗  ${file.filename}: cover art was lost during conversion`)
+        }
+      }
+
       log('success', `✓  ${file.filename}  →  ${options.targetSampleRate} Hz`)
 
+      results.push({
+        path:       outputPath,
+        original:   file.path,
+        sampleRate: actual?.sampleRate ?? options.targetSampleRate,
+        bitrate:    actual?.bitrate ?? null,
+      })
       historyFiles.push({
         original:   file.path,
         backupPath: backupPath,
@@ -95,7 +122,7 @@ async function convertSampleRate(files, options, onProgress, onLog) {
   }
 
   _activeCmd = null
-  return { historyFiles, successCount, errorCount }
+  return { historyFiles, results, successCount, errorCount }
 }
 
 module.exports = { convertSampleRate, cancelConversion }
@@ -121,18 +148,25 @@ function _buildOutputPath(inputPath, options) {
   return path.join(dir, `${base}${suffix}${ext}`)
 }
 
-function _runFfmpeg(input, output, sampleRate, defaultBitrate, onProgress) {
+function _runFfmpeg(input, output, sampleRate, defaultBitrate, onProgress, onStart) {
   return new Promise((resolve, reject) => {
     let duration = 0
 
-    const isMP3 = path.extname(output).toLowerCase() === '.mp3'
-    const mp3Opts = isMP3
-      ? ['-c:a', 'libmp3lame', '-b:a', defaultBitrate || '320k', '-id3v2_version', '3', '-write_id3v1', '1']
+    // Temp files carry a ".tmp_convert.<ext>" tail — the real target extension
+    // is the last one, which is what _normExt/extname pick up either way.
+    const ext     = path.extname(output).toLowerCase().replace('.', '')
+    const isMP3   = ext === 'mp3'
+    const codecOpts = isMP3
+      ? ['-c:a', 'libmp3lame', '-b:a', defaultBitrate || '320k']
       : []
+
+    // Codec first, then the tag/cover mapping — order matters to ffmpeg
+    const outOpts = [...codecOpts, ...metadataOpts(ext)]
 
     const cmd = ffmpeg(input)
       .audioFrequency(sampleRate)
-      .outputOptions(mp3Opts)
+      .outputOptions(outOpts)
+      .on('start', cmdline => { try { onStart?.(cmdline) } catch {} })
       .on('codecData', d => {
         duration = _parseDuration(d.duration)
       })

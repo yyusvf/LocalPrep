@@ -180,7 +180,7 @@ class SampleRateTab {
       const targetRate = e.targetRate.value === 'custom'
         ? parseInt(e.targetCustom.value, 10) : parseInt(e.targetRate.value, 10)
       const seen  = new Set(this.files.map(f => f.path))
-      let added = 0
+      let added = 0, skipped = 0
       for (const dir of dirs) {
         try {
           const found = await window.api.files.scan(dir, {
@@ -189,7 +189,7 @@ class SampleRateTab {
           })
           const fresh = found.filter(f => {
             if (seen.has(f.path)) return false
-            if (targetRate && f.sampleRate === targetRate) return false  // already at target rate
+            if (targetRate && f.sampleRate === targetRate) { skipped++; return false }  // already at target rate
             return true
           })
           fresh.forEach(f => seen.add(f.path))
@@ -200,8 +200,12 @@ class SampleRateTab {
         }
       }
       this.table.setData(this.files)
-      e.statusBar.textContent = `${this.files.length} files found`
-      _toast(added > 0 ? `Added ${added} file${added !== 1 ? 's' : ''}` : 'No new files found')
+      e.statusBar.textContent = skipped > 0
+        ? `${this.files.length} files found — ${skipped} already at ${targetRate} Hz, skipped`
+        : `${this.files.length} files found`
+      _toast(added > 0
+        ? `Added ${added} file${added !== 1 ? 's' : ''}${skipped > 0 ? ` — ${skipped} already at target rate` : ''}`
+        : (skipped > 0 ? `No new files — ${skipped} already at ${targetRate} Hz` : 'No new files found'))
     })
   }
 
@@ -227,12 +231,20 @@ class SampleRateTab {
         recursive:        this.el.subfolders.checked,
         sourceSampleRate: sourceRate || null,
       })
-      // Exclude files that already have the target sample rate
-      const files = targetRate ? raw.filter(f => f.sampleRate !== targetRate) : raw
+      // Exclude files that already have the target sample rate — converting
+      // them would be a no-op. Works for a specific source rate and for "All".
+      const files   = targetRate ? raw.filter(f => f.sampleRate !== targetRate) : raw
+      const skipped = raw.length - files.length
       this.files = files
       this.table.setData(files)
-      this.el.statusBar.textContent = `${files.length} files found`
-      if (!files.length) _toast('No matching files found')
+      this.el.statusBar.textContent = skipped > 0
+        ? `${files.length} files found — ${skipped} already at ${targetRate} Hz, skipped`
+        : `${files.length} files found`
+      if (!files.length) {
+        _toast(skipped > 0
+          ? `No files to convert — all ${skipped} are already at ${targetRate} Hz`
+          : 'No matching files found')
+      }
       // Broadcast this folder as the new shared last-folder
       window._setLastFolder?.(folder)
     } catch (err) {
@@ -292,6 +304,23 @@ class SampleRateTab {
           `Sample Rate → ${targetRate} Hz (${result.successCount} files)`,
           result.historyFiles
         )
+      }
+
+      // Refresh the list with the sample rate that actually landed on disk,
+      // not the value from the original scan
+      if (result.results?.length) {
+        const byOriginal = new Map(result.results.map(r => [r.original, r]))
+        let changed = false
+        for (const f of this.files) {
+          const r = byOriginal.get(f.path)
+          // Only when the original was overwritten does the listed file change;
+          // with a suffix / output folder the row still points at the untouched source
+          if (r?.path === f.path && r.sampleRate && f.sampleRate !== r.sampleRate) {
+            f.sampleRate = r.sampleRate
+            changed = true
+          }
+        }
+        if (changed) this.table.setData(this.files)
       }
 
       this._appendLog({ level: 'info', text: `Done — ${result.successCount} converted, ${result.errorCount} failed` })

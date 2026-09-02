@@ -157,9 +157,38 @@ function _initUpdateListener() {
     if (navBadge) navBadge.style.display = ''
   }
 
-  window.api.updater.onAvailable(info => {
-    _showBanner(`v${info.version} is available — downloading in background…`, { progress: true })
+  // "We just updated" — shown once after the app comes back on a new version
+  window.api.updater.onUpdated?.(({ version }) => {
+    _toast(`Updated to v${version}`)
+  })
+
+  window.api.updater.onDownloading?.(({ version }) => {
+    _showBanner(`Downloading v${version ?? ''}…`, { progress: true })
+  })
+
+  window.api.updater.onAvailable(async info => {
     document.dispatchEvent(new CustomEvent('updater:status', { detail: { type: 'available', info } }))
+
+    // Main decided we should ask. A hidden window gets the banner only —
+    // an unprompted dialog popping out of nowhere is intrusive.
+    if (!info.ask) {
+      _showBanner(`v${info.version} is available`, { install: true })
+      return
+    }
+
+    const ok = await Modal.confirm(
+      `<strong>LocalPrep v${info.version}</strong> is available.<br>` +
+      `You are running v${await window.api.getVersion()}.<br><br>` +
+      `LocalPrep will close to install it. Your settings are kept.`,
+      { title: 'Update available', confirmLabel: 'Install now', cancelLabel: 'Later' }
+    )
+    if (ok) {
+      _showBanner(`Downloading v${info.version}…`, { progress: true })
+      window.api.updater.accept()
+    } else {
+      window.api.updater.skip(info.version)
+      _showBanner(`v${info.version} skipped — install it any time from Settings`, { install: true })
+    }
   })
 
   window.api.updater.onProgress(prog => {

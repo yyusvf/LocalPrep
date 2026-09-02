@@ -76,52 +76,167 @@ function createWindow() {
 }
 
 function _cleanupBackups() {
-  // Intentionally left as a no-op in dev.
-  // In production the build step handles cleanup via the history entries.
+  // Drop backups no history entry points at any more. Anything still
+  // referenced stays, so Undo keeps working across restarts.
+  try {
+    const removed = require('./backend/backups').cleanupOrphans()
+    if (removed) console.log(`Backup cleanup: removed ${removed} orphaned backup(s)`)
+  } catch (err) {
+    console.warn('Orphan backup cleanup failed:', err.message)
+  }
 }
 
 // ── Auto-updater ───────────────────────────────────────────────────
+// Behaviour follows the update spec:
+//   store keys  updateBehavior ('auto'|'ask'|'never'), lastUpdateCheck (ISO UTC),
+//               skippedVersion, lastRunVersion
+//   • 'never' aborts before any network request is made
+//   • only background checks stamp lastUpdateCheck — a manual check must not
+//     consume the daily window, or the automatic one would never fire again
+//   • a declined version is remembered by version number, not by date
+
+const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000   // one day
+
+function _updaterDisabledReason() {
+  if (!app.isPackaged) return 'dev'
+  if (IS_PORTABLE)     return 'portable'   // an installer cannot replace a portable exe
+  if (isDarwin)        return 'mac'        // unsigned build — electron-updater needs signing
+  return null
+}
+
 function _setupAutoUpdater() {
   if (_updaterReady) return
   _updaterReady = true
 
-  // These are always available so the renderer can query the mode
+  const store = require('./backend/store')
+  const send  = (ch, data) => { if (mainWindow?.webContents) mainWindow.webContents.send(ch, data) }
+
+  // Always available so the renderer can render the right UI
   ipcMain.handle('updater:isPortable', () => IS_PORTABLE)
   ipcMain.handle('updater:isPackaged', () => app.isPackaged)
   ipcMain.handle('updater:isMac',      () => isDarwin)
 
-  const send = (ch, data) => { if (mainWindow?.webContents) mainWindow.webContents.send(ch, data) }
+  // ── "We just updated" notice ───────────────────────────────────
+  // Runs regardless of mode: the version changed either way.
+  const current = require('./package.json').version
+  const lastRun = store.get('lastRunVersion')
+  if (lastRun && lastRun !== current) {
+    mainWindow.once('ready-to-show', () => send('updater:updated', { version: current, from: lastRun }))
+    store.set('skippedVersion', null)   // a decline is void once the version changed
+  }
+  store.set('lastRunVersion', current)
 
-  if (!app.isPackaged || IS_PORTABLE || isDarwin) {
-    // Dev, portable, or unsigned macOS build — stub the action channels so invoke() doesn't throw
-    ipcMain.handle('updater:check',   () => null)
+  const disabled = _updaterDisabledReason()
+  if (disabled) {
+    // Stub the action channels so invoke() doesn't throw, and check nothing.
+    ipcMain.handle('updater:check',   () => ({ status: 'disabled', reason: disabled }))
     ipcMain.handle('updater:install', () => null)
+    ipcMain.handle('updater:accept',  () => null)
+    ipcMain.handle('updater:skip',    () => null)
     return
   }
 
+  let autoUpdater
   try {
-    const { autoUpdater } = require('electron-updater')
-    autoUpdater.autoDownload         = true   // download silently in background
-    autoUpdater.autoInstallOnAppQuit = true   // install when user closes app
-
-    autoUpdater.on('update-available',     info => send('updater:available',    info))
-    autoUpdater.on('update-not-available', ()   => send('updater:not-available'))
-    autoUpdater.on('update-downloaded',    info => send('updater:downloaded',   info))
-    autoUpdater.on('download-progress',    prog => send('updater:progress',     prog))
-    autoUpdater.on('error',               err  => send('updater:error',        err.message))
-
-    ipcMain.handle('updater:check',   () => autoUpdater.checkForUpdates().catch(() => {}))
-    ipcMain.handle('updater:install', () => autoUpdater.quitAndInstall(false, true))
-
-    // Automatic background check 5 s after window is shown
-    mainWindow.once('ready-to-show', () => {
-      setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000)
-    })
+    ({ autoUpdater } = require('electron-updater'))
   } catch (err) {
     console.warn('Auto-updater unavailable:', err.message)
-    ipcMain.handle('updater:check',   () => null)
+    ipcMain.handle('updater:check',   () => ({ status: 'disabled', reason: 'unavailable' }))
     ipcMain.handle('updater:install', () => null)
+    ipcMain.handle('updater:accept',  () => null)
+    ipcMain.handle('updater:skip',    () => null)
+    return
   }
+
+  // We drive download and install ourselves so the behaviour setting decides.
+  autoUpdater.autoDownload         = false
+  autoUpdater.autoInstallOnAppQuit = false
+
+  let pending = null   // the found update, kept until the user answers
+
+  autoUpdater.on('download-progress', prog => send('updater:progress',   prog))
+  autoUpdater.on('update-downloaded', info => send('updater:downloaded', info))
+  autoUpdater.on('error',             err  => send('updater:error', err?.message || String(err)))
+
+  /**
+   * @param {boolean} manual  true when the user pressed "Check now"
+   * @returns {Promise<{status:string, version?:string, reason?:string}>}
+   */
+  async function _check(manual) {
+    const behavior = store.get('updateBehavior') || 'ask'
+
+    // "Never" means never — bail out before a single packet leaves the machine.
+    // Manual included: the setting promises silence, and the only way to keep
+    // that promise is not to ask in the first place.
+    if (behavior === 'never') return { status: 'off' }
+
+    if (!manual) {
+      const last = Date.parse(store.get('lastUpdateCheck') || '')
+      if (!isNaN(last) && Date.now() - last < CHECK_INTERVAL_MS) {
+        return { status: 'throttled' }
+      }
+    }
+
+    let result
+    try {
+      result = await autoUpdater.checkForUpdates()
+    } catch (err) {
+      // A failed check is a non-event in the background; only a manual one reports
+      if (manual) return { status: 'error', reason: err?.message || String(err) }
+      return { status: 'error' }
+    } finally {
+      // Only the background check consumes the daily window
+      if (!manual) store.set('lastUpdateCheck', new Date().toISOString())
+    }
+
+    const version = result?.updateInfo?.version
+    if (!version || version === current) {
+      send('updater:not-available')
+      return { status: 'up-to-date' }
+    }
+
+    pending = { version, info: result.updateInfo }
+
+    // ── Decision chain ───────────────────────────────────────────
+    // 1. auto → install without asking
+    if (behavior === 'auto') {
+      _startInstall(true)
+      return { status: 'installing', version }
+    }
+    // 2. already declined → stay quiet, unless the user asked just now
+    if (!manual && store.get('skippedVersion') === version) {
+      return { status: 'skipped', version }
+    }
+    // 3. window not visible → no unsolicited dialog; the renderer's banner
+    //    carries it until the window comes back
+    send('updater:available', { ...result.updateInfo, ask: mainWindow?.isVisible() !== false })
+    return { status: 'available', version }
+  }
+
+  async function _startInstall(silent) {
+    try {
+      send('updater:downloading', { version: pending?.version })
+      await autoUpdater.downloadUpdate()
+      // electron-updater spawns the installer detached and waits for this
+      // process to exit, which is what keeps the silent install from being
+      // cancelled by NSIS's "app is still running" check.
+      autoUpdater.quitAndInstall(silent, true)
+    } catch (err) {
+      send('updater:error', err?.message || String(err))
+    }
+  }
+
+  ipcMain.handle('updater:check',   (_e, manual = true) => _check(!!manual))
+  ipcMain.handle('updater:install', () => _startInstall(false))
+  ipcMain.handle('updater:accept',  () => _startInstall(false))
+  ipcMain.handle('updater:skip',    (_e, version) => {
+    store.set('skippedVersion', version || pending?.version || null)
+  })
+
+  // Background check shortly after the window is up — never blocking startup
+  mainWindow.once('ready-to-show', () => {
+    setTimeout(() => { _check(false).catch(() => {}) }, 5000)
+  })
 }
 
 // ── Window controls ────────────────────────────────────────────────
@@ -210,7 +325,8 @@ ipcMain.handle('convert:sampleRate', async (event, files, options) => {
 // ── Format conversion ──────────────────────────────────────────────
 ipcMain.handle('convert:format', async (event, files, options) => {
   const store = require('./backend/store')
-  options.backupFolder = store.get('backupFolder')
+  options.backupFolder   = store.get('backupFolder')
+  options.defaultBitrate = store.get('defaultBitrate') || '320k'
   const { convertFormat } = require('./backend/converterFormat')
   return convertFormat(
     files, options,
@@ -220,33 +336,8 @@ ipcMain.handle('convert:format', async (event, files, options) => {
 })
 
 // ── Backup management ──────────────────────────────────────────────
-ipcMain.handle('backup:getInfo', () => {
-  const store  = require('./backend/store')
-  const folder = store.get('backupFolder')
-  let count = 0, size = 0
-  try {
-    const { readdirSync, statSync } = require('fs')
-    const files = readdirSync(folder).filter(f => f.endsWith('.bak'))
-    count = files.length
-    size  = files.reduce((acc, f) => {
-      try { return acc + statSync(require('path').join(folder, f)).size } catch { return acc }
-    }, 0)
-  } catch {}
-  return { count, size, folder }
-})
-ipcMain.handle('backup:deleteAll', () => {
-  const store  = require('./backend/store')
-  const folder = store.get('backupFolder')
-  let deleted = 0
-  try {
-    const { readdirSync, unlinkSync } = require('fs')
-    const p = require('path')
-    for (const f of readdirSync(folder).filter(f => f.endsWith('.bak'))) {
-      try { unlinkSync(p.join(folder, f)); deleted++ } catch {}
-    }
-  } catch {}
-  return deleted
-})
+ipcMain.handle('backup:getInfo',   () => require('./backend/backups').getInfo())
+ipcMain.handle('backup:deleteAll', () => require('./backend/backups').deleteAll())
 
 // ── Cancel ─────────────────────────────────────────────────────────
 ipcMain.handle('convert:cancel', (_, tab) => {
@@ -276,6 +367,14 @@ ipcMain.handle('history:clear', (_, type)   => require('./backend/history').clea
 
 // ── App lifecycle ──────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // Drop backups older than the configured retention before anything else
+  // touches the history — entries then correctly show up as non-undoable.
+  try {
+    const removed = require('./backend/backups').cleanupExpired()
+    if (removed) console.log(`Backup cleanup: removed ${removed} expired backup(s)`)
+  } catch (err) {
+    console.warn('Backup cleanup failed:', err.message)
+  }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })

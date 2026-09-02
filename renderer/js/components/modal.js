@@ -53,13 +53,13 @@ class Modal {
    * Show a simple confirm dialog.
    * @returns {Promise<boolean>}
    */
-  static confirm(message, { title = 'Confirm', confirmLabel = 'Confirm', danger = false } = {}) {
+  static confirm(message, { title = 'Confirm', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
     return new Promise(resolve => {
       const { close, overlay } = Modal.open({
         title,
         body: `<p style="color:var(--text-secondary);line-height:1.6">${message}</p>`,
         footer: `
-          <button class="btn btn-ghost btn-sm" id="mcCancel">Cancel</button>
+          <button class="btn btn-ghost btn-sm" id="mcCancel">${cancelLabel}</button>
           <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" id="mcConfirm">${confirmLabel}</button>
         `,
       })
