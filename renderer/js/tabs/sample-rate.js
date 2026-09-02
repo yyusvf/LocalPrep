@@ -59,15 +59,15 @@ class SampleRateTab {
 
   _buildTable() {
     this.table = new FileTable(this.el.tableWrap, [
-      { key: 'filename',   label: 'Filename',    width: '260px', title: true },
-      { key: 'format',     label: 'Format',      width: '70px'  },
-      { key: 'sampleRate', label: 'Sample Rate', width: '100px',
+      { key: 'filename',   i18nKey: 'col.filename', label: i18n.t('col.filename',   'Filename'),    width: '260px', title: true },
+      { key: 'format',     i18nKey: 'col.format', label: i18n.t('col.format',     'Format'),      width: '70px'  },
+      { key: 'sampleRate', i18nKey: 'col.sampleRate', label: i18n.t('col.sampleRate', 'Sample Rate'), width: '100px',
         format: v => v ? `${(v/1000).toFixed(v % 1000 === 0 ? 0 : 1)} kHz` : '—' },
-      { key: 'size',       label: 'Size',        width: '80px',
+      { key: 'size',       i18nKey: 'col.size', label: i18n.t('col.size',       'Size'),        width: '80px',
         format: v => _fmtSize(v) },
     ], {
       onSelectionChange: (sel, total) => {
-        this.el.statusBar.textContent = `${sel} of ${total} selected`
+        this.el.statusBar.textContent = `${sel} ${i18n.t('common.selected', 'of {total} selected', { total })}`
         this.el.convertBtn.disabled   = sel === 0 || this.converting
       },
       onContextMenu: (x, y, row, selected) => {
@@ -213,10 +213,10 @@ class SampleRateTab {
   async _search() {
     // Fall back to the last-used folder (shown dimly as placeholder)
     const folder = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
-    if (!folder) { _toast('Choose a folder first'); return }
+    if (!folder) { _toast(i18n.t('common.chooseFolder', 'Choose a folder first')); return }
 
     this.el.searchBtn.disabled = true
-    this.el.searchBtn.textContent = 'Scanning…'
+    this.el.searchBtn.textContent = i18n.t('common.scanning', 'Scanning…')
 
     const sourceRate = this.el.sourceRate.value === 'custom'
       ? parseInt(this.el.sourceCustom.value, 10)
@@ -251,7 +251,7 @@ class SampleRateTab {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
       this.el.searchBtn.disabled = false
-      this.el.searchBtn.textContent = 'Search Files'
+      this.el.searchBtn.textContent = i18n.t('sr.search', 'Search Files')
     }
   }
 

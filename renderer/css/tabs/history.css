@@ -49,13 +49,23 @@
 
 .history-table tbody .ft-row:hover td { background: var(--bg-hover); }
 
+.history-table-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
 .hist-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 200px;
+  flex: 1;
+  min-height: 200px;
   color: var(--text-tertiary);
   font-size: 13px;
 }
+
+/* While the empty state is up the table is hidden outright — otherwise its
+   sticky header sits stranded halfway down the window. */
+.history-table-wrap.is-empty .history-table { display: none; }

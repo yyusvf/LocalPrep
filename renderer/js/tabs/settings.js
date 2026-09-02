@@ -44,13 +44,16 @@ class SettingsTab {
 
     // Automatic cleanup — applied at the next app start
     window.api.store.get('backupRetention').then(v => {
-      if (retentionSel) retentionSel.value = String(v || 'never')
+      // Fallback matches the store default ('7'), so the dropdown never
+      // claims a policy that is not the one actually running at startup
+      if (retentionSel) retentionSel.value = String(v || '7')
     })
     retentionSel?.addEventListener('change', () => {
       window.api.store.set('backupRetention', retentionSel.value)
       _toast(retentionSel.value === 'never'
-        ? 'Backups are kept indefinitely'
-        : `Backups older than ${retentionSel.value} days are removed at startup`)
+        ? i18n.t('set.keepForever', 'Backups are kept indefinitely')
+        : i18n.t('set.retentionSet', 'Backups older than {n} days are removed at startup',
+                 { n: retentionSel.value }))
     })
 
     const refreshInfo = async () => {
@@ -120,7 +123,7 @@ class SettingsTab {
     const _applyBehavior = v => {
       // "Never" promises no network request at all, so the manual button goes too
       if (checkBtn && !checkBtn.dataset.forcedOff) checkBtn.disabled = v === 'never'
-      if (statusEl && v === 'never') statusEl.textContent = 'Checking is turned off'
+      if (statusEl && v === 'never') statusEl.textContent = i18n.t('set.checkingOff', 'Checking is turned off')
     }
     window.api.store.get('updateBehavior').then(v => {
       const val = v || 'ask'
@@ -163,7 +166,7 @@ class SettingsTab {
         if (checkBtn)  { checkBtn.disabled = true; checkBtn.dataset.forcedOff = '1' }
         if (statusEl)    statusEl.textContent     = msg
       }
-      if      (mac)       off('macOS — download updates from GitHub', portableEl)
+      if      (mac)       off('macOS — ' + i18n.t('set.hintPortable', 'download updates from GitHub'), portableEl)
       else if (portable)  off('Portable — manual updates only',       portableEl)
       else if (!packaged) off('Dev mode',                             devEl)
     }).catch(() => {})
@@ -191,7 +194,7 @@ class SettingsTab {
           statusEl.dataset.state = 'available'
           break
         case 'not-available':
-          statusEl.textContent = 'Up to date ✓'
+          statusEl.textContent = i18n.t('set.upToDate', 'Up to date ✓')
           statusEl.dataset.state = 'ok'
           _refreshLastCheck()
           break
@@ -206,14 +209,14 @@ class SettingsTab {
     checkBtn?.addEventListener('click', async () => {
       if (checkBtn.disabled) return
       checkBtn.disabled    = true
-      checkBtn.textContent = 'Checking…'
+      checkBtn.textContent = i18n.t('set.checking', 'Checking…')
       if (statusEl) { statusEl.textContent = ''; delete statusEl.dataset.state }
       try {
         // manual = true → does not consume the daily background window
         const r = await window.api.updater.check(true)
         const msg = {
-          'off':        'Checking is turned off',
-          'up-to-date': 'Up to date ✓',
+          'off':        i18n.t('set.checkingOff', 'Checking is turned off'),
+          'up-to-date': i18n.t('set.upToDate', 'Up to date ✓'),
           'available':  r?.version ? `v${r.version} available` : 'Update available',
           'installing': `Installing v${r?.version ?? ''}…`,
           'skipped':    r?.version ? `v${r.version} available` : 'Update available',
@@ -229,7 +232,7 @@ class SettingsTab {
         if (statusEl) { statusEl.textContent = `Error: ${err.message}`; statusEl.dataset.state = 'error' }
       } finally {
         checkBtn.disabled    = false
-        checkBtn.textContent = 'Check for Updates'
+        checkBtn.textContent = i18n.t('set.checkUpdates', 'Check for Updates')
       }
     })
   }

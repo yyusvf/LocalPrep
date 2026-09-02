@@ -6,11 +6,16 @@
 }
 
 .settings-form {
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  max-width: 1040px;
+  display: grid;
+  /* Two columns whenever they fit; one as soon as the window gets narrow */
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+  gap: 20px;
 }
+
+/* Save / reset spans the full width and stays at the bottom */
+.settings-footer { grid-column: 1 / -1; }
 
 .settings-group {
   display: flex;

@@ -53,7 +53,10 @@ class Modal {
    * Show a simple confirm dialog.
    * @returns {Promise<boolean>}
    */
-  static confirm(message, { title = 'Confirm', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+  static confirm(message, { title, confirmLabel, cancelLabel, danger = false } = {}) {
+    title        = title        ?? i18n.t('common.confirm', 'Confirm')
+    confirmLabel = confirmLabel ?? i18n.t('common.confirm', 'Confirm')
+    cancelLabel  = cancelLabel  ?? i18n.t('common.cancel',  'Cancel')
     return new Promise(resolve => {
       const { close, overlay } = Modal.open({
         title,

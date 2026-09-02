@@ -58,14 +58,14 @@ class MetadataTab {
 
   _buildTable() {
     this.table = new FileTable(this.el.tableWrap, [
-      { key: 'filename',   label: 'Filename',  width: '200px', title: true },
-      { key: 'title',      label: 'Title',     width: '150px', title: true },
-      { key: 'artist',     label: 'Artist',    width: '120px' },
-      { key: 'album',      label: 'Album',     width: '120px' },
-      { key: 'track',      label: 'Track Nr.', width: '80px'  },
+      { key: 'filename',   i18nKey: 'col.filename', label: i18n.t('col.filename', 'Filename'),  width: '200px', title: true },
+      { key: 'title',      i18nKey: 'fld.title', label: i18n.t('fld.title',    'Title'),     width: '150px', title: true },
+      { key: 'artist',     i18nKey: 'fld.artist', label: i18n.t('fld.artist',   'Artist'),    width: '120px' },
+      { key: 'album',      i18nKey: 'fld.album', label: i18n.t('fld.album',    'Album'),     width: '120px' },
+      { key: 'track',      i18nKey: 'col.trackNr', label: i18n.t('col.trackNr',  'Track Nr.'), width: '80px'  },
     ], {
       onSelectionChange: (sel, total) => {
-        this.el.statusBar.textContent = `${sel} of ${total} selected`
+        this.el.statusBar.textContent = `${sel} ${i18n.t('common.selected', 'of {total} selected', { total })}`
         this.el.saveBtn.disabled      = sel === 0
         if (sel === 0) { this._clearEditor(); return }
         const selected = this.table.getSelected()
@@ -161,15 +161,15 @@ class MetadataTab {
   async _search() {
     // Fall back to the last-used folder (shown dimly as placeholder)
     const folder = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
-    if (!folder) { _toast('Choose a folder first'); return }
+    if (!folder) { _toast(i18n.t('common.chooseFolder', 'Choose a folder first')); return }
 
     this.el.searchBtn.disabled    = true
-    this.el.searchBtn.textContent = 'Scanning…'
+    this.el.searchBtn.textContent = i18n.t('common.scanning', 'Scanning…')
     try {
       const files = await window.api.files.scan(folder, { recursive: this.el.subfolders.checked })
       this.files = files
       this.table.setData(files)
-      this.el.statusBar.textContent = `${files.length} files found`
+      this.el.statusBar.textContent = i18n.t('common.found', '{n} files found', { n: files.length })
       this._clearEditor()
       // Broadcast this folder as the new shared last-folder
       window._setLastFolder?.(folder)
@@ -177,7 +177,7 @@ class MetadataTab {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
       this.el.searchBtn.disabled    = false
-      this.el.searchBtn.textContent = 'Search Files'
+      this.el.searchBtn.textContent = i18n.t('sr.search', 'Search Files')
     }
   }
 
@@ -414,7 +414,7 @@ class MetadataTab {
   _openBatchRename() {
     const checked = this.table.getSelected()
     const files   = checked.length > 0 ? checked : this.table.getAll()
-    if (!files.length) { _toast('No files loaded'); return }
+    if (!files.length) { _toast(i18n.t('common.noFilesLoaded', 'No files loaded')); return }
 
     const DEFAULT_PATTERN = '{track} - {title}'
     let saveTimer = null
@@ -506,7 +506,7 @@ class MetadataTab {
   async _openTracklist() {
     const checked = this.table.getSelected()
     const files   = checked.length > 0 ? checked : this.table.getAll()
-    if (!files.length) { _toast('No files loaded'); return }
+    if (!files.length) { _toast(i18n.t('common.noFilesLoaded', 'No files loaded')); return }
 
     // Group by disc
     const discs = {}
@@ -564,14 +564,14 @@ class MetadataTab {
 
       const label = document.createElement('span')
       label.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em'
-      label.textContent = `Disc ${dk}`
+      label.textContent = `${i18n.t('tl.disc', 'Disc')} ${dk}`
       header.appendChild(label)
 
       if (discKeys.length > 1) {
         const rmBtn = document.createElement('button')
         rmBtn.className = 'btn btn-ghost btn-xs remove-disc'
         rmBtn.dataset.disc = dk
-        rmBtn.textContent = 'Remove Disc'
+        rmBtn.textContent = i18n.t('tl.removeDisc', 'Remove Disc')
         header.appendChild(rmBtn)
       }
 
@@ -615,9 +615,50 @@ class MetadataTab {
       })
     }
 
+    // ── Rename row — one compact line right under the modal title ────
+    // Reuses the Batch Rename pattern (same store key), editable inline so the
+    // numbering and the renaming can be done in a single pass.
+    const RENAME_DEFAULT = '{track} - {title}'
+    const renameRow = document.createElement('div')
+    renameRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid var(--border)'
+    renameRow.innerHTML = `
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;flex-shrink:0;white-space:nowrap">
+        <input type="checkbox" id="tlRename" style="cursor:pointer">
+        <span data-i18n="tl.rename">Rename files</span>
+      </label>
+      <input class="input input-sm input-mono" id="tlPattern" style="flex:1;min-width:0" placeholder="${RENAME_DEFAULT}" disabled>
+    `
+
+    const renameChk = renameRow.querySelector('#tlRename')
+    const patInput  = renameRow.querySelector('#tlPattern')
+    let patSaveTimer = null
+
+    Promise.all([
+      window.api.store.get('batchRenamePattern'),
+      window.api.store.get('tracklistRename'),
+    ]).then(([pat, on]) => {
+      patInput.value    = pat || RENAME_DEFAULT
+      renameChk.checked = !!on
+      patInput.disabled = !on
+    })
+
+    renameChk.addEventListener('change', () => {
+      patInput.disabled = !renameChk.checked
+      window.api.store.set('tracklistRename', renameChk.checked)
+      if (renameChk.checked) patInput.focus()
+    })
+    patInput.addEventListener('input', () => {
+      clearTimeout(patSaveTimer)
+      patSaveTimer = setTimeout(() => window.api.store.set('batchRenamePattern', patInput.value), 600)
+    })
+
     // ── Build body ───────────────────────────────────────────────────
+    // bodyEl scrolls; the rename row above it stays put.
     const bodyEl = document.createElement('div')
     bodyEl.style.cssText = 'max-height:420px;overflow-y:auto'
+
+    const modalBody = document.createElement('div')
+    modalBody.append(renameRow, bodyEl)
 
     const buildBody = () => {
       bodyEl.innerHTML = ''
@@ -646,20 +687,17 @@ class MetadataTab {
     })
 
     const { close, overlay } = Modal.open({
-      title: 'Tracklist Sequencer',
-      body: bodyEl,
+      title: i18n.t('tl.title', 'Tracklist Sequencer'),
+      body: modalBody,
       width: 580,
       footer: `
-        <button class="btn btn-ghost btn-sm" id="tlAddDisc">+ Add Disc</button>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;margin-left:12px">
-          <input type="checkbox" id="tlUpdateFilenames" style="cursor:pointer">
-          Dateinamen aktualisieren
-        </label>
+        <button class="btn btn-ghost btn-sm" id="tlAddDisc" data-i18n="tl.addDisc">+ Add Disc</button>
         <div style="flex:1"></div>
-        <button class="btn btn-ghost btn-sm" id="tlCancel">Cancel</button>
-        <button class="btn btn-primary btn-sm" id="tlApply">Apply Track Numbers</button>
+        <button class="btn btn-ghost btn-sm" id="tlCancel" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="tlApply" data-i18n="tl.apply">Apply Track Numbers</button>
       `,
     })
+    i18n._apply()
 
     overlay.querySelector('#tlAddDisc').addEventListener('click', () => {
       const newKey = String(discKeys.length ? Math.max(...discKeys.map(Number)) + 1 : 2)
@@ -675,7 +713,11 @@ class MetadataTab {
     overlay.querySelector('#tlCancel').addEventListener('click', close)
 
     overlay.querySelector('#tlApply').addEventListener('click', async () => {
-      const updateFilenames = overlay.querySelector('#tlUpdateFilenames').checked
+      const doRename = renameChk.checked
+      const pattern  = patInput.value.trim() || RENAME_DEFAULT
+      // The pattern rename replaces the old renumber-in-place behaviour —
+      // running both would rename each file twice.
+      const updateFilenames = false
       const assignments = []
       discKeys.forEach(dk => {
         const rows = bodyEl.querySelectorAll(`.disc-tracks[data-disc="${dk}"] .track-row`)
@@ -687,17 +729,43 @@ class MetadataTab {
       if (!assignments.length) { _toast('No files to process', 'error'); return }
       try {
         const hf = await window.api.metadata.applyTrackNumbers(assignments)
+        const failed = assignments.length - hf.length
+        const assignMap = new Map(assignments.map(a => [a.path, a]))
+        const renameMap = new Map(hf.filter(f => f.renamedTo).map(f => [f.original, f.renamedTo]))
+
+        // ── Optional rename, using the freshly written numbers ────────
+        let renamed = 0
+        if (doRename && hf.length) {
+          // Feed the renamer the updated track/disc, or {track} would still
+          // expand to the value from before the reorder
+          const forRename = hf.map(h => {
+            const src = this.files.find(f => f.path === h.original)
+            const a   = assignMap.get(h.original)
+            return { ...src, path: h.original, track: String(a.track), discNumber: String(a.disc) }
+          })
+          const results = await window.api.metadata.batchRename(forRename, pattern)
+          const byPath  = new Map(hf.map(h => [h.original, h]))
+          results.forEach(r => {
+            if (!r.success) return
+            renameMap.set(r.original, r.newPath)
+            // Record it on the history entry, so an undo also removes the
+            // renamed copy instead of leaving a duplicate behind
+            const h = byPath.get(r.original)
+            if (h) h.renamedTo = r.newPath
+            renamed++
+          })
+        }
+
+        // Written after the rename so the entry carries the final paths
         if (hf.length) {
           await window.api.history.add('metadata', `Tracklist applied (${hf.length} files)`, hf)
         }
-        const failed = assignments.length - hf.length
-        _toast(`Applied to ${hf.length} file${hf.length !== 1 ? 's' : ''}${failed ? ` — ${failed} failed` : ''}`,
+
+        _toast(`${i18n.t('tl.applied', 'Applied to')} ${hf.length} ${i18n.t('common.files', 'files')}`
+          + (renamed ? `, ${renamed} ${i18n.t('tl.renamed', 'renamed')}` : '')
+          + (failed  ? ` — ${failed} ${i18n.t('common.failed', 'failed')}` : ''),
           failed ? 'error' : 'success')
         close()
-
-        // Build lookup maps so we can update in-memory data directly — no rescan needed
-        const assignMap = new Map(assignments.map(a => [a.path, a]))
-        const renameMap = new Map(hf.filter(f => f.renamedTo).map(f => [f.original, f.renamedTo]))
 
         // Update this.files in-place
         this.files = this.files.map(f => {

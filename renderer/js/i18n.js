@@ -14,10 +14,24 @@ const i18n = {
     }
   },
 
-  setLanguage(lang) { this.load(lang) },
+  async setLanguage(lang) {
+    await this.load(lang)
+    // Labels baked into JS-built widgets (table headers, etc.) are not
+    // covered by _apply(); they listen for this instead.
+    document.dispatchEvent(new CustomEvent('i18n:changed', { detail: { lang } }))
+  },
 
-  t(key, fallback = key) {
-    return this._store[key] ?? fallback
+  /**
+   * Look up a key. Any {name} in the string is replaced from `params`, so
+   * counts and versions can sit inside the translated sentence rather than
+   * being glued on in whatever order English happens to use.
+   */
+  t(key, fallback = key, params = null) {
+    let out = this._store[key] ?? fallback
+    if (params) {
+      for (const [k, v] of Object.entries(params)) out = out.split(`{${k}}`).join(v)
+    }
+    return out
   },
 
   _apply() {

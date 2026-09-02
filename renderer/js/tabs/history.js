@@ -25,6 +25,10 @@ class HistoryTab {
 
     tbody.innerHTML = ''
 
+    // is-empty hides the table, so its header row doesn't hang in mid-window
+    const wrap = this.el.emptyState.parentElement
+    wrap?.classList.toggle('is-empty', !filtered.length)
+
     if (!filtered.length) {
       this.el.emptyState.style.display = ''
       return
@@ -35,7 +39,11 @@ class HistoryTab {
       const tr = document.createElement('tr')
       tr.className = 'ft-row'
 
-      const typeLabel = { 'sample-rate': 'Sample Rate', 'format': 'Format', 'metadata': 'Metadata' }[entry.type] || entry.type
+      const typeLabel = {
+        'sample-rate': i18n.t('nav.samplerate', 'Sample Rate'),
+        'format':      i18n.t('nav.format',     'Format'),
+        'metadata':    i18n.t('nav.metadata',   'Metadata'),
+      }[entry.type] || entry.type
       const typeColor = { 'sample-rate': '#60a5fa', 'format': '#c8f542', 'metadata': '#f472b6' }[entry.type] || 'var(--text-secondary)'
 
       tr.innerHTML = `
@@ -45,12 +53,12 @@ class HistoryTab {
         <td style="color:var(--text-tertiary);font-size:11px;text-align:center">${entry.fileCount}</td>
         <td style="text-align:right">
           <button class="btn btn-secondary btn-xs undo-btn" data-id="${entry.id}"
-                  ${entry.canUndo ? '' : 'disabled title="Backup deleted or expired — nothing left to restore"'}>↩ Undo</button>
+                  ${entry.canUndo ? '' : `disabled title="${i18n.t('hist.undoUnavailable', 'Backup deleted or expired — nothing left to restore')}"`}>↩ ${i18n.t('hist.undo', 'Undo')}</button>
         </td>
       `
 
       tr.querySelector('.undo-btn').addEventListener('click', async () => {
-        if (!entry.canUndo) { _toast('No backup left for this operation', 'error'); return }
+        if (!entry.canUndo) { _toast(i18n.t('hist.undoUnavailable', 'No backup left for this operation'), 'error'); return }
         const ok = await Modal.confirm(
           `Undo: <strong>${entry.description}</strong>?<br>This will restore ${entry.fileCount} file(s).`,
           { title: 'Undo Operation', confirmLabel: 'Undo' }

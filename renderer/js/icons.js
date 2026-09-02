@@ -72,20 +72,21 @@ window.ICONS = {
   </svg>`,
 
   // ── Titlebar (Windows) ───────────────────────────────────────────
+  // Caption glyphs matching Explorer's: 10x10 box, 1px square-cut strokes
   winMinimize: `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M2 5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M0 5h10" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
   </svg>`,
 
   winMaximize: `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1.5" y="1.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/>
+    <rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
   </svg>`,
 
   winRestore: `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="3.5" y="1.5" width="5" height="5" rx="0.8" stroke="currentColor" stroke-width="1.2"/>
-    <path d="M1.5 4.5v4h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M2.5 2.5V0.5h7v7h-2" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
+    <rect x="0.5" y="2.5" width="7" height="7" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
   </svg>`,
 
   winClose: `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" stroke-width="1"/>
   </svg>`,
 }

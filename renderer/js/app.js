@@ -159,11 +159,11 @@ function _initUpdateListener() {
 
   // "We just updated" — shown once after the app comes back on a new version
   window.api.updater.onUpdated?.(({ version }) => {
-    _toast(`Updated to v${version}`)
+    _toast(i18n.t('upd.updated', 'Updated to v{v}', { v: version }))
   })
 
   window.api.updater.onDownloading?.(({ version }) => {
-    _showBanner(`Downloading v${version ?? ''}…`, { progress: true })
+    _showBanner(i18n.t('upd.downloading', 'Downloading v{v}…', { v: version ?? '' }), { progress: true })
   })
 
   window.api.updater.onAvailable(async info => {
@@ -172,22 +172,27 @@ function _initUpdateListener() {
     // Main decided we should ask. A hidden window gets the banner only —
     // an unprompted dialog popping out of nowhere is intrusive.
     if (!info.ask) {
-      _showBanner(`v${info.version} is available`, { install: true })
+      _showBanner(i18n.t('upd.available', 'Update available') + ` — v${info.version}`, { install: true })
       return
     }
 
     const ok = await Modal.confirm(
-      `<strong>LocalPrep v${info.version}</strong> is available.<br>` +
-      `You are running v${await window.api.getVersion()}.<br><br>` +
-      `LocalPrep will close to install it. Your settings are kept.`,
-      { title: 'Update available', confirmLabel: 'Install now', cancelLabel: 'Later' }
+      i18n.t('upd.body',
+        '<strong>LocalPrep v{new}</strong> is available.<br>You are running v{cur}.<br><br>'
+        + 'LocalPrep will close to install it. Your settings are kept.',
+        { new: info.version, cur: await window.api.getVersion() }),
+      {
+        title:        i18n.t('upd.title',    'Update available'),
+        confirmLabel: i18n.t('upd.install',  'Install now'),
+        cancelLabel:  i18n.t('upd.later',    'Later'),
+      }
     )
     if (ok) {
       _showBanner(`Downloading v${info.version}…`, { progress: true })
       window.api.updater.accept()
     } else {
       window.api.updater.skip(info.version)
-      _showBanner(`v${info.version} skipped — install it any time from Settings`, { install: true })
+      _showBanner(i18n.t('upd.skipped', 'v{v} skipped — install it any time from Settings', { v: info.version }), { install: true })
     }
   })
 
@@ -257,6 +262,11 @@ async function init() {
     if (controls) controls.style.display = 'none'
   }
 
+  // Language first — tab modules build headers and labels during init(),
+  // and those are only translated if the strings are already loaded.
+  const savedLang = await window.api.store.get('language') || 'en'
+  await i18n.load(savedLang)
+
   // Core modules
   Nav.init()
   Player.init()
@@ -319,9 +329,15 @@ async function init() {
     label.textContent = 'ffmpeg error'
   }
 
-  // Load saved language
-  const savedLang = await window.api.store.get('language') || 'en'
-  i18n.load(savedLang)
+  // Re-apply once every tab has rendered its markup
+  i18n._apply()
+
+  // Table headers are built in JS, so they need an explicit nudge on a switch
+  document.addEventListener('i18n:changed', () => {
+    window.SampleRateTab?.table?.retranslate()
+    window.FormatTab?.table?.retranslate()
+    window.MetadataTab?.table?.retranslate()
+  })
 }
 
 document.addEventListener('DOMContentLoaded', init)

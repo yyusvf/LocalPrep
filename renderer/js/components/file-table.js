@@ -42,6 +42,22 @@ class FileTable {
 
   // ── Public ───────────────────────────────────────────────────────
 
+  /**
+   * Re-read every column label from i18n and redraw the header row.
+   * Column labels are baked in at construction, so a live language switch
+   * would otherwise leave them in the old language until restart.
+   * Columns opt in by carrying an `i18nKey`.
+   */
+  retranslate() {
+    for (const list of [this._origCols, this.columns]) {
+      for (const col of list) {
+        if (col.i18nKey) col.label = i18n.t(col.i18nKey, col.label)
+      }
+    }
+    if (this._hrow) this._rebuildHeaders(this._hrow)
+    this._updateSortHeaders()
+  }
+
   setData(rows) {
     this._rows      = rows
     this._filtered  = [...rows]

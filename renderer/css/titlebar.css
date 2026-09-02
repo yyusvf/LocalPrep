@@ -33,13 +33,13 @@
   -webkit-app-region: drag;
 }
 
-/* Window control buttons (Windows only) */
+/* Window control buttons (Windows only).
+   Explorer's geometry: 46x32, flush into the top-right corner with no gap,
+   no rounding, and the hover fill covering the whole rectangle. */
 .titlebar-controls {
   display: flex;
   align-items: stretch;
   height: 32px;
-  margin-top: 16px;            /* centres the 32px row on the 28px logo */
-  padding-right: 8px;
   pointer-events: auto;
   -webkit-app-region: no-drag;
 }
@@ -48,19 +48,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  width: 46px;
   height: 100%;
-  color: var(--text-tertiary);
-  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  border-radius: 0;
   transition: background var(--ease-fast), color var(--ease-fast);
   flex-shrink: 0;
 }
 .titlebar-btn:hover {
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
+}
+.titlebar-btn:active {
+  background: rgba(255, 255, 255, 0.04);
 }
 .titlebar-btn--close:hover {
   background: #c42b1c;
+  color: #fff;
+}
+.titlebar-btn--close:active {
+  background: #b02a1d;
   color: #fff;
 }
 .titlebar-btn svg { pointer-events: none; }

@@ -55,12 +55,12 @@ class FormatTab {
 
   _buildTable() {
     this.table = new FileTable(this.el.tableWrap, [
-      { key: 'filename', label: 'Filename', width: '280px', title: true },
-      { key: 'format',   label: 'Format',   width: '80px'  },
-      { key: 'size',     label: 'Size',     width: '80px', format: v => _fmtSize(v) },
+      { key: 'filename', i18nKey: 'col.filename', label: i18n.t('col.filename', 'Filename'), width: '280px', title: true },
+      { key: 'format',   i18nKey: 'col.format', label: i18n.t('col.format',   'Format'),   width: '80px'  },
+      { key: 'size',     i18nKey: 'col.size', label: i18n.t('col.size',     'Size'),     width: '80px', format: v => _fmtSize(v) },
     ], {
       onSelectionChange: (sel, total) => {
-        this.el.statusBar.textContent   = `${sel} of ${total} selected`
+        this.el.statusBar.textContent   = `${sel} ${i18n.t('common.selected', 'of {total} selected', { total })}`
         this.el.convertBtn.disabled     = sel === 0 || this.converting
       },
       onContextMenu: (x, y, row, selected) => {
@@ -250,11 +250,11 @@ class FormatTab {
   async _search() {
     // Fall back to the last-used folder (shown dimly as placeholder)
     const folder    = this.el.folderPath.value.trim() || this.el.folderPath.dataset.lastPath || ''
-    if (!folder)    { _toast('Choose a folder first'); return }
+    if (!folder)    { _toast(i18n.t('common.chooseFolder', 'Choose a folder first')); return }
     const sourceFmt = this.el.sourceFormat.value
 
     this.el.searchBtn.disabled    = true
-    this.el.searchBtn.textContent = 'Scanning…'
+    this.el.searchBtn.textContent = i18n.t('common.scanning', 'Scanning…')
 
     try {
       const files = await window.api.files.scan(folder, {
@@ -269,15 +269,15 @@ class FormatTab {
       })
       this.files = filtered
       this.table.setData(filtered)
-      this.el.statusBar.textContent = `${filtered.length} files found`
-      if (!filtered.length) _toast('No matching files found')
+      this.el.statusBar.textContent = i18n.t('common.found', '{n} files found', { n: filtered.length })
+      if (!filtered.length) _toast(i18n.t('common.noMatch', 'No matching files found'))
       // Broadcast this folder as the new shared last-folder
       window._setLastFolder?.(folder)
     } catch (err) {
       _toast(`Scan error: ${err.message}`, 'error')
     } finally {
       this.el.searchBtn.disabled    = false
-      this.el.searchBtn.textContent = 'Search Files'
+      this.el.searchBtn.textContent = i18n.t('sr.search', 'Search Files')
     }
   }
 

@@ -9,7 +9,7 @@ const store = new Store({
     defaultSuffix: '_converted',
     defaultBitrate: '320k',
     backupFolder: path.join(os.homedir(), 'LocalPrep', 'Backups'),
-    backupRetention: 'never',   // 'never' | '7' | '30' (days)
+    backupRetention: '7',       // 'never' | '7' | '30' (days)
     updateBehavior: 'ask',      // 'auto' | 'ask' | 'never'
     lastUpdateCheck: null,      // ISO 8601 UTC — background checks only
     skippedVersion: null,       // version the user declined
