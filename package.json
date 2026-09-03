@@ -1,7 +1,7 @@
 {
   "name": "localprep",
   "productName": "LocalPrep",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Local audio preparation tool — sample rate conversion, format conversion, and metadata editing",
   "author": {
     "name": "yyusvf",
