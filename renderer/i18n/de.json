@@ -106,11 +106,9 @@
   "set.keepForever": "Backups werden unbegrenzt aufbewahrt",
   "set.retentionSet": "Backups älter als {n} Tage werden beim Start entfernt",
   "tl.title": "Tracklist-Sequencer",
-  "tl.rename": "Dateien umbenennen",
   "tl.addDisc": "+ Disc hinzufügen",
   "tl.apply": "Tracknummern anwenden",
   "tl.applied": "Angewendet auf",
-  "tl.renamed": "umbenannt",
   "tl.removeDisc": "Disc entfernen",
   "tl.disc": "Disc",
   "rn.title": "Batch-Umbenennung",
@@ -157,5 +155,6 @@
   "col.sampleRate": "Sample Rate",
   "col.size": "Größe",
   "col.trackNr": "Track-Nr.",
-  "common.scanning": "Suche…"
+  "common.scanning": "Suche…",
+  "tl.updateFilenames": "Dateinamen aktualisieren"
 }

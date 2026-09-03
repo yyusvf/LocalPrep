@@ -615,50 +615,9 @@ class MetadataTab {
       })
     }
 
-    // ── Rename row — one compact line right under the modal title ────
-    // Reuses the Batch Rename pattern (same store key), editable inline so the
-    // numbering and the renaming can be done in a single pass.
-    const RENAME_DEFAULT = '{track} - {title}'
-    const renameRow = document.createElement('div')
-    renameRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid var(--border)'
-    renameRow.innerHTML = `
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;flex-shrink:0;white-space:nowrap">
-        <input type="checkbox" id="tlRename" style="cursor:pointer">
-        <span data-i18n="tl.rename">Rename files</span>
-      </label>
-      <input class="input input-sm input-mono" id="tlPattern" style="flex:1;min-width:0" placeholder="${RENAME_DEFAULT}" disabled>
-    `
-
-    const renameChk = renameRow.querySelector('#tlRename')
-    const patInput  = renameRow.querySelector('#tlPattern')
-    let patSaveTimer = null
-
-    Promise.all([
-      window.api.store.get('batchRenamePattern'),
-      window.api.store.get('tracklistRename'),
-    ]).then(([pat, on]) => {
-      patInput.value    = pat || RENAME_DEFAULT
-      renameChk.checked = !!on
-      patInput.disabled = !on
-    })
-
-    renameChk.addEventListener('change', () => {
-      patInput.disabled = !renameChk.checked
-      window.api.store.set('tracklistRename', renameChk.checked)
-      if (renameChk.checked) patInput.focus()
-    })
-    patInput.addEventListener('input', () => {
-      clearTimeout(patSaveTimer)
-      patSaveTimer = setTimeout(() => window.api.store.set('batchRenamePattern', patInput.value), 600)
-    })
-
     // ── Build body ───────────────────────────────────────────────────
-    // bodyEl scrolls; the rename row above it stays put.
     const bodyEl = document.createElement('div')
     bodyEl.style.cssText = 'max-height:420px;overflow-y:auto'
-
-    const modalBody = document.createElement('div')
-    modalBody.append(renameRow, bodyEl)
 
     const buildBody = () => {
       bodyEl.innerHTML = ''
@@ -688,10 +647,14 @@ class MetadataTab {
 
     const { close, overlay } = Modal.open({
       title: i18n.t('tl.title', 'Tracklist Sequencer'),
-      body: modalBody,
+      body: bodyEl,
       width: 580,
       footer: `
         <button class="btn btn-ghost btn-sm" id="tlAddDisc" data-i18n="tl.addDisc">+ Add Disc</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;margin-left:12px;white-space:nowrap">
+          <input type="checkbox" id="tlUpdateFilenames" style="cursor:pointer">
+          <span data-i18n="tl.updateFilenames">Update filenames</span>
+        </label>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" id="tlCancel" data-i18n="common.cancel">Cancel</button>
         <button class="btn btn-primary btn-sm" id="tlApply" data-i18n="tl.apply">Apply Track Numbers</button>
@@ -713,11 +676,7 @@ class MetadataTab {
     overlay.querySelector('#tlCancel').addEventListener('click', close)
 
     overlay.querySelector('#tlApply').addEventListener('click', async () => {
-      const doRename = renameChk.checked
-      const pattern  = patInput.value.trim() || RENAME_DEFAULT
-      // The pattern rename replaces the old renumber-in-place behaviour —
-      // running both would rename each file twice.
-      const updateFilenames = false
+      const updateFilenames = overlay.querySelector('#tlUpdateFilenames').checked
       const assignments = []
       discKeys.forEach(dk => {
         const rows = bodyEl.querySelectorAll(`.disc-tracks[data-disc="${dk}"] .track-row`)
@@ -733,37 +692,12 @@ class MetadataTab {
         const assignMap = new Map(assignments.map(a => [a.path, a]))
         const renameMap = new Map(hf.filter(f => f.renamedTo).map(f => [f.original, f.renamedTo]))
 
-        // ── Optional rename, using the freshly written numbers ────────
-        let renamed = 0
-        if (doRename && hf.length) {
-          // Feed the renamer the updated track/disc, or {track} would still
-          // expand to the value from before the reorder
-          const forRename = hf.map(h => {
-            const src = this.files.find(f => f.path === h.original)
-            const a   = assignMap.get(h.original)
-            return { ...src, path: h.original, track: String(a.track), discNumber: String(a.disc) }
-          })
-          const results = await window.api.metadata.batchRename(forRename, pattern)
-          const byPath  = new Map(hf.map(h => [h.original, h]))
-          results.forEach(r => {
-            if (!r.success) return
-            renameMap.set(r.original, r.newPath)
-            // Record it on the history entry, so an undo also removes the
-            // renamed copy instead of leaving a duplicate behind
-            const h = byPath.get(r.original)
-            if (h) h.renamedTo = r.newPath
-            renamed++
-          })
-        }
-
-        // Written after the rename so the entry carries the final paths
         if (hf.length) {
           await window.api.history.add('metadata', `Tracklist applied (${hf.length} files)`, hf)
         }
 
         _toast(`${i18n.t('tl.applied', 'Applied to')} ${hf.length} ${i18n.t('common.files', 'files')}`
-          + (renamed ? `, ${renamed} ${i18n.t('tl.renamed', 'renamed')}` : '')
-          + (failed  ? ` — ${failed} ${i18n.t('common.failed', 'failed')}` : ''),
+          + (failed ? ` — ${failed} ${i18n.t('common.failed', 'failed')}` : ''),
           failed ? 'error' : 'success')
         close()
 
