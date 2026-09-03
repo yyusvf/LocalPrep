@@ -159,5 +159,9 @@
   "tl.updateFilenames": "Update filenames",
   "openWith.title": "Open with LocalPrep",
   "set.servicesMenu": "macOS Services menu",
-  "set.hintServices": "Adds \"LocalPrep\" to the right-click Services menu for audio files and folders. No admin rights required."
+  "set.hintServices": "Adds \"LocalPrep\" to the right-click Services menu for audio files and folders. No admin rights required.",
+  "set.hintMacUnsigned": "This build isn't code-signed, which macOS requires for auto-update. Download new versions manually from GitHub.",
+  "set.statusMacUnsigned": "Unsigned build — auto-update unavailable",
+  "set.statusPortable": "Portable — manual updates only",
+  "set.statusDev": "Dev mode"
 }

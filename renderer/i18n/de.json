@@ -159,5 +159,9 @@
   "tl.updateFilenames": "Dateinamen aktualisieren",
   "openWith.title": "Mit LocalPrep öffnen",
   "set.servicesMenu": "macOS Dienste-Menü",
-  "set.hintServices": "Fügt „LocalPrep“ zum Rechtsklick-Menü unter „Dienste“ hinzu, für Audiodateien und Ordner. Keine Administratorrechte nötig."
+  "set.hintServices": "Fügt „LocalPrep“ zum Rechtsklick-Menü unter „Dienste“ hinzu, für Audiodateien und Ordner. Keine Administratorrechte nötig.",
+  "set.hintMacUnsigned": "Dieser Build ist nicht signiert — macOS verlangt eine Signatur für Auto-Updates. Neue Versionen manuell von GitHub laden.",
+  "set.statusMacUnsigned": "Unsignierter Build — Auto-Update nicht verfügbar",
+  "set.statusPortable": "Portable — nur manuelle Updates",
+  "set.statusDev": "Entwicklermodus"
 }

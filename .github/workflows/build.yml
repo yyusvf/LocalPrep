@@ -100,3 +100,91 @@ jobs:
           name: LocalPrep-mac-pr${{ github.event.pull_request.number }}
           path: dist/*.dmg
           retention-days: 7
+
+  # ── Finalize release ────────────────────────────────────────────────
+  # Runs once, after both platform jobs are done building AND have finished
+  # their own `electron-builder --publish always` upload. electron-builder
+  # always leaves a GitHub release as a draft — it never un-drafts on its
+  # own — so doing that here, exactly once, replaces two people/jobs racing
+  # to publish the same release (which is what left v0.3.1 and v0.3.2 stuck
+  # as drafts until someone noticed and ran `gh release edit --draft=false`
+  # by hand).
+  #
+  # Also drops the *.blockmap sidecar files (they only enable delta/diff
+  # downloads for the auto-updater; without them an update is simply a full
+  # download instead) and fixes asset order. GitHub's release API has no
+  # "set display order" field — the documented workaround is to delete and
+  # re-upload assets in the order you want them to appear.
+  #
+  # latest.yml / latest-mac.yml are kept: electron-updater reads them to
+  # detect new versions at all, on both Windows and macOS.
+  finalize-release:
+    name: Finalize release
+    needs: [build-windows, build-mac]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drop blockmaps, order assets, publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          REPO="${{ github.repository }}"
+          tmp="$(mktemp -d)"
+
+          list_assets() { gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' > "$tmp/assets.txt"; }
+
+          # electron-builder's own upload runs async with this job starting;
+          # give the release a few tries to exist before giving up.
+          found=""
+          for i in $(seq 1 12); do
+            if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+              found=1
+              break
+            fi
+            sleep 5
+          done
+          if [ -z "$found" ]; then
+            echo "::error::Release $TAG never appeared — nothing to finalize"
+            exit 1
+          fi
+
+          # Drop every blockmap outright.
+          list_assets
+          mapfile -t assets < "$tmp/assets.txt"
+          for name in "${assets[@]}"; do
+            case "$name" in
+              *.blockmap)
+                echo "Removing $name"
+                gh release delete-asset "$TAG" "$name" --repo "$REPO" --yes
+                ;;
+            esac
+          done
+
+          # Re-order what's left: exe installers, then the dmg, then the
+          # update-feed ymls. Delete + re-upload in that order — GitHub shows
+          # assets in upload order, and there is no other way to set it.
+          list_assets
+          mapfile -t remaining < "$tmp/assets.txt"
+          ordered=()
+          for pat in '*Setup*.exe' '*Portable*.exe' '*.dmg' '*.yml'; do
+            for name in "${remaining[@]}"; do
+              case "$name" in
+                $pat) ordered+=("$name") ;;
+              esac
+            done
+          done
+
+          dl="$tmp/downloads"
+          mkdir -p "$dl"
+          for name in "${ordered[@]}"; do
+            gh release download "$TAG" --repo "$REPO" --pattern "$name" --dir "$dl" --clobber
+            gh release delete-asset "$TAG" "$name" --repo "$REPO" --yes
+          done
+          for name in "${ordered[@]}"; do
+            gh release upload "$TAG" "$dl/$name" --repo "$REPO"
+          done
+
+          gh release edit "$TAG" --repo "$REPO" --draft=false --latest

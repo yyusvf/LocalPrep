@@ -19,8 +19,12 @@
   flex-shrink: 0;
 }
 
-/* On macOS push logo below the traffic lights */
-body.is-darwin .sidebar-logo { padding-top: 22px; }
+/* On macOS push logo below the traffic lights.
+   The traffic-light cluster's origin is trafficLightPosition {x:14,y:14} in
+   main.js, and the reserved hit area is roughly 16-18px tall — so the previous
+   22px (only 4-8px clearance) let the logo's own 28px icon overlap the dots.
+   38px leaves a clean gap below the lowest point of the cluster. */
+body.is-darwin .sidebar-logo { padding-top: 38px; }
 
 .logo-icon {
   display: flex;

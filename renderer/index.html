@@ -549,8 +549,12 @@
               <span class="updater-status" id="updaterStatus"></span>
             </div>
             <p class="settings-hint updater-portable-hint" id="updaterPortableHint" style="display:none">
-              Portable version — auto-update unavailable. Download updates manually from
+              <span data-i18n="set.hintPortable">Portable version — auto-update unavailable. Download updates manually from GitHub.</span>
               <a class="credits-link" id="updaterGithubLink" href="#">GitHub</a>.
+            </p>
+            <p class="settings-hint updater-mac-hint" id="updaterMacHint" style="display:none">
+              <span data-i18n="set.hintMacUnsigned">This build isn't code-signed, which macOS requires for auto-update. Download new versions manually from GitHub.</span>
+              <a class="credits-link" id="updaterGithubLinkMac" href="#">GitHub</a>.
             </p>
             <p class="settings-hint updater-dev-hint" id="updaterDevHint" style="display:none" data-i18n="set.hintDev">Running in dev mode — auto-update inactive.</p>
           </div>

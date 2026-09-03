@@ -114,9 +114,11 @@ class SettingsTab {
     const statusEl    = document.getElementById('updaterStatus')
     const lastCheckEl = document.getElementById('updaterLastCheck')
     const portableEl  = document.getElementById('updaterPortableHint')
+    const macEl       = document.getElementById('updaterMacHint')
     const devEl       = document.getElementById('updaterDevHint')
     const versionEl   = document.getElementById('updaterCurrentVersion')
     const githubLink  = document.getElementById('updaterGithubLink')
+    const githubLinkMac = document.getElementById('updaterGithubLinkMac')
     const behaviorSel = document.getElementById('setUpdateBehavior')
     const behaviorRow = document.getElementById('updaterBehaviorRow')
 
@@ -148,6 +150,10 @@ class SettingsTab {
       e.preventDefault()
       window.api.shell.openExternal('https://github.com/yyusvf/LocalPrep/releases/latest')
     })
+    githubLinkMac?.addEventListener('click', e => {
+      e.preventDefault()
+      window.api.shell.openExternal('https://github.com/yyusvf/LocalPrep/releases/latest')
+    })
 
     // Restore last check timestamp
     window.api.store.get('lastUpdateCheck').then(ts => {
@@ -168,9 +174,16 @@ class SettingsTab {
         if (checkBtn)  { checkBtn.disabled = true; checkBtn.dataset.forcedOff = '1' }
         if (statusEl)    statusEl.textContent     = msg
       }
-      if      (mac)       off('macOS — ' + i18n.t('set.hintPortable', 'download updates from GitHub'), portableEl)
-      else if (portable)  off('Portable — manual updates only',       portableEl)
-      else if (!packaged) off('Dev mode',                             devEl)
+      // Each mode gets its own hint element and wording — reusing the portable
+      // copy for macOS is what previously made an unsigned Mac build's status
+      // read "Portable", which is not what is actually happening: the build
+      // is not portable, it is simply unsigned, and Squirrel.Mac (the engine
+      // electron-updater uses on macOS) refuses to auto-update an unsigned
+      // app regardless of anything this app does — Apple requires a paid
+      // Developer ID certificate for that to work at all.
+      if      (mac)       off(i18n.t('set.statusMacUnsigned', 'Unsigned build — auto-update unavailable'), macEl)
+      else if (portable)  off(i18n.t('set.statusPortable',    'Portable — manual updates only'),           portableEl)
+      else if (!packaged) off(i18n.t('set.statusDev',         'Dev mode'),                                 devEl)
     }).catch(() => {})
 
     // Only the background check writes lastUpdateCheck. If a manual check
