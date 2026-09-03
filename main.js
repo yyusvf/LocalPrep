@@ -302,15 +302,16 @@ ipcMain.handle('files:readOne', async (_, filePath) => {
 })
 
 // ── Shell Extension ────────────────────────────────────────────────
-ipcMain.handle('shellext:isRegistered', () => {
-  return require('./backend/shellExtension').isRegistered()
-})
-ipcMain.handle('shellext:register', async () => {
-  await require('./backend/shellExtension').register()
-})
-ipcMain.handle('shellext:unregister', async () => {
-  await require('./backend/shellExtension').unregister()
-})
+// Windows uses a registry entry, macOS a Quick Action in ~/Library/Services.
+// Both expose the same three calls, so the renderer needs no platform branch.
+function shellIntegration() {
+  if (isDarwin) return require('./backend/servicesMac')
+  return require('./backend/shellExtension')
+}
+
+ipcMain.handle('shellext:isRegistered', () => shellIntegration().isRegistered())
+ipcMain.handle('shellext:register',     async () => { await shellIntegration().register() })
+ipcMain.handle('shellext:unregister',   async () => { await shellIntegration().unregister() })
 
 // ── Sample Rate conversion ─────────────────────────────────────────
 ipcMain.handle('convert:sampleRate', async (event, files, options) => {

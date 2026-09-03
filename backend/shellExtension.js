@@ -13,11 +13,9 @@ const EXTS = ['.mp3', '.flac', '.wav', '.ogg', '.m4a']
 const HKCU      = 'HKCU:\\Software\\Classes\\SystemFileAssociations'
 const HKCU_DIR  = 'HKCU:\\Software\\Classes\\Directory'
 
-const ACTIONS = [
-  { id: 'sr',   label: 'Convert Sample Rate', tab: 'sr'   },
-  { id: 'fmt',  label: 'Convert Format',       tab: 'fmt'  },
-  { id: 'meta', label: 'Edit Metadata',        tab: 'meta' },
-]
+// One plain entry, no cascading submenu: the app asks which tab to open once
+// it has the path, where the question can be asked in the user's language and
+// with the file in view.
 
 // ── Public API ────────────────────────────────────────────────────
 
@@ -90,27 +88,39 @@ function newKey(key) {
   return `New-Item -Path ${psq(key)} -Force | Out-Null\n`
 }
 
-/** The cascading parent plus its three actions, for one registry base path. */
+/** A single clickable "LocalPrep" entry for one registry base path. */
 function menuScript(base, icon, exe, argName) {
   let s = newKey(base)
-  s += setProp(base, 'MUIVerb', 'LocalPrep')
-  s += setProp(base, 'SubCommands', '')
+  s += setDefault(base, 'LocalPrep')        // the label shown in the menu
   s += setProp(base, 'Icon', icon)          // logo next to the name
-  s += newKey(`${base}\\shell`)
-  for (const a of ACTIONS) {
-    const key = `${base}\\shell\\${a.id}`
-    s += newKey(key)
-    s += setDefault(key, a.label)
-    s += newKey(`${key}\\command`)
-    s += setDefault(`${key}\\command`, `${exe} --tab ${a.tab} --${argName} "%1"`)
-  }
+  s += newKey(`${base}\\command`)
+  // No --tab: the app opens its own picker for the three tabs
+  s += setDefault(`${base}\\command`, `${exe} --${argName} "%1"`)
   return s
+}
+
+/** Every key this extension owns, file entries plus the folder entry. */
+function baseKeys() {
+  return [
+    ...EXTS.map(ext => `${HKCU}\\${ext}\\shell\\LocalPrep`),
+    `${HKCU_DIR}\\shell\\LocalPrep`,
+  ]
+}
+
+function removeScript() {
+  return baseKeys()
+    .map(k => `if (Test-Path ${psq(k)}) { Remove-Item -Path ${psq(k)} -Recurse -Force }\n`)
+    .join('')
 }
 
 async function register() {
   const exe  = getExePath()
   const icon = getIconRef()
-  let script = '$ErrorActionPreference = "Stop"\n'
+
+  // Clear first. An entry written by an older version is a cascading menu
+  // (SubCommands + a shell subkey); leaving those behind would keep it
+  // cascading no matter what we write now.
+  let script = '$ErrorActionPreference = "Stop"\n' + removeScript()
 
   for (const ext of EXTS) {
     script += menuScript(`${HKCU}\\${ext}\\shell\\LocalPrep`, icon, exe, 'file')
@@ -121,14 +131,7 @@ async function register() {
 }
 
 async function unregister() {
-  let script = ''
-  for (const ext of EXTS) {
-    const base = `${HKCU}\\${ext}\\shell\\LocalPrep`
-    script += `if (Test-Path "${base}") { Remove-Item -Path "${base}" -Recurse -Force }\n`
-  }
-  const dirBase = `${HKCU_DIR}\\shell\\LocalPrep`
-  script += `if (Test-Path "${dirBase}") { Remove-Item -Path "${dirBase}" -Recurse -Force }\n`
-  return _runPs(script)
+  return _runPs(removeScript())
 }
 
 // ── Private ────────────────────────────────────────────────────────

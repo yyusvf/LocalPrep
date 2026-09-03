@@ -96,7 +96,7 @@
   "set.author": "Author",
   "set.hintRetention": "Runs at startup. Older backups are removed and the matching History entries can no longer be undone.",
   "set.hintDeleteBackups": "Deletes stored undo files. Undo in History will no longer work for past operations.",
-  "set.hintShellExt": "Adds \"LocalPrep\" to the right-click menu for audio files (.mp3, .flac, .wav, .ogg, .m4a). No admin rights required.",
+  "set.hintShellExt": "Adds \"LocalPrep\" to the right-click menu for audio files (.mp3, .flac, .wav, .ogg, .m4a) and folders. No admin rights required.",
   "set.hintFfmpeg": "ffmpeg is bundled — no configuration needed.",
   "set.hintDev": "Running in dev mode — auto-update inactive.",
   "set.hintPortable": "Portable version — auto-update unavailable. Download updates manually from GitHub.",
@@ -156,5 +156,8 @@
   "col.size": "Size",
   "col.trackNr": "Track Nr.",
   "common.scanning": "Scanning…",
-  "tl.updateFilenames": "Update filenames"
+  "tl.updateFilenames": "Update filenames",
+  "openWith.title": "Open with LocalPrep",
+  "set.servicesMenu": "macOS Services menu",
+  "set.hintServices": "Adds \"LocalPrep\" to the right-click Services menu for audio files and folders. No admin rights required."
 }

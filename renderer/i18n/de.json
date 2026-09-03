@@ -96,7 +96,7 @@
   "set.author": "Autor",
   "set.hintRetention": "Läuft beim Start. Ältere Backups werden entfernt, die zugehörigen Verlaufseinträge lassen sich danach nicht mehr rückgängig machen.",
   "set.hintDeleteBackups": "Löscht die gespeicherten Undo-Dateien. Rückgängig im Verlauf funktioniert danach für frühere Operationen nicht mehr.",
-  "set.hintShellExt": "Fügt „LocalPrep“ zum Rechtsklick-Menü für Audiodateien hinzu (.mp3, .flac, .wav, .ogg, .m4a). Keine Administratorrechte nötig.",
+  "set.hintShellExt": "Fügt „LocalPrep“ zum Rechtsklick-Menü für Audiodateien hinzu (.mp3, .flac, .wav, .ogg, .m4a) und für Ordner. Keine Administratorrechte nötig.",
   "set.hintFfmpeg": "ffmpeg ist mitgeliefert — keine Konfiguration nötig.",
   "set.hintDev": "Entwicklermodus — Auto-Update inaktiv.",
   "set.hintPortable": "Portable Version — Auto-Update nicht verfügbar. Updates manuell von GitHub laden.",
@@ -156,5 +156,8 @@
   "col.size": "Größe",
   "col.trackNr": "Track-Nr.",
   "common.scanning": "Suche…",
-  "tl.updateFilenames": "Dateinamen aktualisieren"
+  "tl.updateFilenames": "Dateinamen aktualisieren",
+  "openWith.title": "Mit LocalPrep öffnen",
+  "set.servicesMenu": "macOS Dienste-Menü",
+  "set.hintServices": "Fügt „LocalPrep“ zum Rechtsklick-Menü unter „Dienste“ hinzu, für Audiodateien und Ordner. Keine Administratorrechte nötig."
 }

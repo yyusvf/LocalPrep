@@ -137,6 +137,80 @@ Object.assign(ICONS, {
   </svg>`,
 })
 
+/**
+ * Ask which tab to open a path in.
+ * Shown when the shell integration hands over a file or folder without saying
+ * what to do with it — the context menu is a single "LocalPrep" entry.
+ * @returns {Promise<string|null>} panel id, or null if dismissed
+ */
+function _askTargetTab(targetPath, isFolder) {
+  const name = String(targetPath || '').split(/[\\/]/).pop() || targetPath || ''
+
+  const choices = [
+    { id: 'sample-rate', icon: ICONS.sampleRate, key: 'nav.samplerate', fallback: 'Sample Rate',
+      descKey: 'sr.subtitle',   descFallback: 'Convert audio files to a target sample rate' },
+    { id: 'format',      icon: ICONS.format,     key: 'nav.format',     fallback: 'Format',
+      descKey: 'fmt.subtitle',  descFallback: 'Convert between audio formats' },
+    { id: 'metadata',    icon: ICONS.metadata,   key: 'nav.metadata',   fallback: 'Metadata',
+      descKey: 'meta.subtitle', descFallback: 'Edit tags, cover art and ordering' },
+  ]
+
+  return new Promise(resolve => {
+    const body = document.createElement('div')
+    body.className = 'open-with'
+    body.innerHTML = `
+      <p class="open-with-path" title="${_escAttr(targetPath || '')}">
+        <span class="open-with-kind">${isFolder ? ICONS.folder : ''}</span>${_escHtml(name)}
+      </p>
+      <div class="open-with-list">
+        ${choices.map(c => `
+          <button class="open-with-item" data-tab="${c.id}">
+            <span class="open-with-icon">${c.icon}</span>
+            <span class="open-with-text">
+              <span class="open-with-label">${_escHtml(i18n.t(c.key, c.fallback))}</span>
+              <span class="open-with-desc">${_escHtml(i18n.t(c.descKey, c.descFallback))}</span>
+            </span>
+          </button>`).join('')}
+      </div>
+    `
+
+    const { overlay, close } = Modal.open({
+      title: i18n.t('openWith.title', 'Open with LocalPrep'),
+      body,
+      width: 460,
+    })
+
+    let answered = false
+    // The Escape listener is on document, so it has to come off on every exit
+    // path — not just the Escape one — or each invocation leaves one behind.
+    const onEsc = e => { if (e.key === 'Escape') finish(null) }
+    const finish = value => {
+      if (answered) return
+      answered = true
+      document.removeEventListener('keydown', onEsc)
+      close()
+      resolve(value)
+    }
+
+    overlay.querySelectorAll('.open-with-item').forEach(btn => {
+      btn.addEventListener('click', () => finish(btn.dataset.tab))
+    })
+    // Dismissing the modal (X, Escape, click outside) means "do nothing"
+    overlay.querySelector('.modal-close').addEventListener('click', () => finish(null))
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) finish(null) })
+    document.addEventListener('keydown', onEsc)
+
+    body.querySelector('.open-with-item')?.focus()
+  })
+}
+
+function _escHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+}
+function _escAttr(s) {
+  return _escHtml(s).replace(/"/g, '&quot;')
+}
+
 // ── Auto-update banner ────────────────────────────────────────────
 function _initUpdateListener() {
   const banner       = document.getElementById('updateBanner')
@@ -282,11 +356,16 @@ async function init() {
   // Auto-update banner
   _initUpdateListener()
 
-  // CLI / shell-extension open handler
-  window.api.onCliOpen(({ tab, file, folder }) => {
+  // CLI / shell-integration open handler
+  window.api.onCliOpen(async ({ tab, file, folder }) => {
     const tabMap = { sr: 'sample-rate', fmt: 'format', meta: 'metadata' }
-    const tabId  = tabMap[tab] || tab
-    if (tabId) Nav.navigate(tabId)
+    // The context menu sends no --tab: it is one plain "LocalPrep" entry, and
+    // the choice of tab is made here, where it can be asked in the user's
+    // language with the file in view.
+    const tabId = tabMap[tab] || tab || await _askTargetTab(file || folder, !!folder)
+    if (!tabId) return
+
+    Nav.navigate(tabId)
     const tabObj = tabId === 'sample-rate' ? window.SampleRateTab
                  : tabId === 'format'      ? window.FormatTab
                  : tabId === 'metadata'    ? window.MetadataTab

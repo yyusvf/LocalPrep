@@ -561,3 +561,73 @@ input[type='radio'] {
   flex-direction: column;
   overflow: hidden;
 }
+
+/* ── "Open with" picker ──────────────────────────────────────────
+   Shown when the shell integration hands over a path without saying
+   which tab should handle it. */
+.open-with-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono, monospace);
+  margin-bottom: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.open-with-kind { display: flex; flex-shrink: 0; color: var(--accent); }
+.open-with-kind:empty { display: none; }
+
+.open-with-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.open-with-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 13px;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--ease-fast), border-color var(--ease-fast);
+}
+.open-with-item:hover,
+.open-with-item:focus-visible {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  outline: none;
+}
+.open-with-item:focus-visible { border-color: var(--accent); }
+
+.open-with-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.open-with-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.open-with-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.open-with-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -20,9 +20,11 @@ class SettingsTab {
     // Credits: populate version + wire GitHub link
     this._initCredits()
 
-    // Shell extension (Windows only)
-    if (window.api.platform === 'win32') this._initShellExt()
-    else {
+    // Shell integration — registry entry on Windows, Services entry on macOS.
+    // Linux has neither, so the section is hidden there.
+    if (window.api.platform === 'win32' || window.api.platform === 'darwin') {
+      this._initShellExt()
+    } else {
       const g = document.getElementById('shellExtGroup')
       if (g) g.style.display = 'none'
     }
@@ -241,6 +243,23 @@ class SettingsTab {
     const statusEl     = document.getElementById('shellExtStatus')
     const registerBtn  = document.getElementById('shellExtRegister')
     const unregisterBtn= document.getElementById('shellExtUnregister')
+    const labelEl      = document.getElementById('shellExtLabel')
+    const hintEl       = document.getElementById('shellExtHint')
+
+    // Same three buttons on both platforms, different wording — Windows writes
+    // a registry entry, macOS installs a Quick Action into the Services menu.
+    const isMac = window.api.platform === 'darwin'
+    if (isMac) {
+      if (labelEl) {
+        labelEl.dataset.i18n    = 'set.servicesMenu'
+        labelEl.textContent     = i18n.t('set.servicesMenu', 'macOS Services menu')
+      }
+      if (hintEl) {
+        hintEl.dataset.i18n = 'set.hintServices'
+        hintEl.textContent  = i18n.t('set.hintServices',
+          'Adds "LocalPrep" to the right-click Services menu for audio files and folders. No admin rights required.')
+      }
+    }
 
     const refresh = async () => {
       if (!statusEl) return
