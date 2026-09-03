@@ -94,8 +94,10 @@ function menuScript(base, icon, exe, argName) {
   s += setDefault(base, 'LocalPrep')        // the label shown in the menu
   s += setProp(base, 'Icon', icon)          // logo next to the name
   s += newKey(`${base}\\command`)
-  // No --tab: the app opens its own picker for the three tabs
-  s += setDefault(`${base}\\command`, `${exe} --${argName} "%1"`)
+  // No --tab: the app opens its own picker for the three tabs.
+  // The value must be attached with "=", or Chromium's command-line
+  // re-serialisation separates the flag from the path (see parseArgs).
+  s += setDefault(`${base}\\command`, `${exe} --${argName}="%1"`)
   return s
 }
 

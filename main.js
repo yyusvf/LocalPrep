@@ -7,14 +7,51 @@ let mainWindow
 let _updaterReady = false   // guard: ipcMain.handle() can only be called once per channel
 
 // ── CLI argument parser ────────────────────────────────────────────
+/**
+ * Read --tab / --file / --folder out of a command line.
+ *
+ * Values must arrive as --key=value. Chromium re-serialises a command line as
+ * "program, switches…, arguments…", so with the "--file <path>" form the flag
+ * gets hoisted to the front while the path drops to the end, and a switch
+ * Chromium adds itself lands in between:
+ *
+ *   given:  LocalPrep.exe --file "C:\Music\Song.mp3"
+ *   seen:   [exe, --file, --allow-file-access-from-files, C:\Music\Song.mp3]
+ *
+ * Reading "the token after --file" then yields --allow-file-access-from-files
+ * as the path. --file=value survives intact, spaces included.
+ */
 function parseArgs(argv) {
-  let tab = null, file = null, folder = null
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--tab'    && argv[i + 1]) tab    = argv[++i]
-    if (argv[i] === '--file'   && argv[i + 1]) file   = argv[++i]
-    if (argv[i] === '--folder' && argv[i + 1]) folder = argv[++i]
+  const values     = { tab: null, file: null, folder: null }
+  const bareFlags  = []   // our flags that arrived without a value
+  const positional = []
+
+  let appPath = null
+  try { appPath = path.resolve(app.getAppPath()) } catch {}
+
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i]
+
+    const m = /^--(tab|file|folder)(?:=([\s\S]*))?$/.exec(arg)
+    if (m) {
+      if (m[2] !== undefined) values[m[1]] = m[2]
+      else bareFlags.push(m[1])
+      continue
+    }
+    if (arg.startsWith('-')) continue        // some other Chromium switch
+
+    // In a dev run the app directory is a plain argument too — not a payload
+    try { if (appPath && path.resolve(arg) === appPath) continue } catch {}
+    positional.push(arg)
   }
-  return { tab, file, folder }
+
+  // Entries registered before 0.3.2 still use the "--file <path>" form. Their
+  // path is whatever plain argument is left over, so pair the two back up.
+  for (const key of bareFlags) {
+    if (values[key] === null && positional.length) values[key] = positional.shift()
+  }
+
+  return values
 }
 
 // ── Single-instance lock ───────────────────────────────────────────

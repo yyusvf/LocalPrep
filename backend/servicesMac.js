@@ -69,9 +69,11 @@ function shellScript({ exe, appPath }) {
     `    if [ -z "$(find "$f" -maxdepth 3 -type f \\( ${findExpr} \\) -print -quit)" ]; then`,
     `      continue`,
     `    fi`,
-    `    ${launch} --folder "$f" &`,
+    // "=" attached: Chromium reorders a command line into switches-then-args,
+    // which separates a detached flag from its path (see parseArgs in main.js)
+    `    ${launch} "--folder=$f" &`,
     `  else`,
-    `    ${launch} --file "$f" &`,
+    `    ${launch} "--file=$f" &`,
     `  fi`,
     `done`,
     ``,
