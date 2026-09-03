@@ -47,12 +47,14 @@
       "repo": "LocalPrep"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         { "target": "nsis",     "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ]
     },
     "mac": {
+      "icon": "build/icon.png",
       "target": [
         { "target": "dmg", "arch": ["x64"] }
       ],

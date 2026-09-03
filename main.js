@@ -43,6 +43,9 @@ function createWindow() {
     minWidth:  960,
     minHeight: 640,
     backgroundColor: '#0a0a0a',
+    // Packaged builds get the icon from the exe itself; in dev this gives the
+    // window and taskbar the real logo instead of the Electron default.
+    icon: path.join(__dirname, 'build', 'icon.png'),
     show: false,
     ...(isDarwin
       ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 14, y: 14 } }

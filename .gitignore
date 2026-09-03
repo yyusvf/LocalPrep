@@ -4,7 +4,6 @@ node_modules/
 # ── Build outputs ────────────────────────────────────────────────────
 dist/
 out/
-build/
 *.AppImage
 *.dmg
 *.deb
@@ -48,3 +47,6 @@ desktop.ini
 
 # ── Temp / installer scripts ─────────────────────────────────────────
 lp_shellext_*.ps1
+
+# NOTE: build/ is intentionally NOT ignored — it holds the app icon, which
+# electron-builder needs at build time. Only its generated output is ignored.

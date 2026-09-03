@@ -21,15 +21,39 @@ const ACTIONS = [
 
 // ── Public API ────────────────────────────────────────────────────
 
+/**
+ * The quoted launcher for a registry command value.
+ *
+ * Packaged, process.execPath is LocalPrep.exe and launches on its own. In a dev
+ * run it is electron.exe, which needs the app directory as its first argument —
+ * without it the menu entry appears but starts nothing.
+ */
 function getExePath() {
   const { app } = require('electron')
-  return app.isPackaged ? process.execPath : process.execPath
+  if (app.isPackaged) return `"${process.execPath}"`
+  return `"${process.execPath}" "${app.getAppPath()}"`
+}
+
+/**
+ * Icon shown next to the "LocalPrep" entry in the context menu.
+ * Explorer takes "<file>,<index>"; index 0 is the exe's own embedded icon,
+ * which electron-builder sets from build/icon.ico. In a dev run process.execPath
+ * is electron.exe, so the bundled .ico is used directly instead.
+ */
+function getIconRef() {
+  const { app } = require('electron')
+  // Packaged: the exe carries the icon electron-builder embedded from build/icon.ico
+  if (app.isPackaged) return process.execPath + ',0'
+  // Dev: point at the .ico directly. Resolved from this file, not from
+  // app.getAppPath(), so it holds however the app was launched.
+  const dev = path.join(__dirname, '..', 'build', 'icon.ico')
+  return fs.existsSync(dev) ? dev : process.execPath + ',0'
 }
 
 function isRegistered() {
   try {
     const key = `${HKCU}\\.mp3\\shell\\LocalPrep`
-    const out  = execSync(
+    const out = execSync(
       `powershell -NoProfile -Command "Test-Path '${key}'"`,
       { encoding: 'utf8', timeout: 5000 }
     )
@@ -39,47 +63,59 @@ function isRegistered() {
   }
 }
 
-async function register() {
-  const exe = getExePath().replace(/\\/g, '\\\\')
-  let script = ''
+/**
+ * Quote a value for a PowerShell single-quoted string.
+ *
+ * Everything here goes into a generated .ps1. Double-quoted PS strings were
+ * used before, which silently broke the command entries: a backslash is not an
+ * escape character in PowerShell, so the \" around the exe path terminated the
+ * string early and every command value ended up empty — the menu appeared but
+ * did nothing. In single-quoted strings the only escape is '' for a quote, so
+ * Windows paths and the embedded " around %1 pass through untouched.
+ */
+function psq(value) {
+  return `'${String(value).replace(/'/g, "''")}'`
+}
 
-  // ── Per-extension file entries ────────────────────────────────
-  for (const ext of EXTS) {
-    const base = `${HKCU}\\${ext}\\shell\\LocalPrep`
-    script += `
-New-Item -Path "${base}" -Force | Out-Null
-Set-ItemProperty -Path "${base}" -Name "MUIVerb" -Value "LocalPrep" -Force
-Set-ItemProperty -Path "${base}" -Name "SubCommands" -Value "" -Force
-New-Item -Path "${base}\\shell" -Force | Out-Null
-`
-    for (const a of ACTIONS) {
-      const cmd = `\\"${exe}\\" --tab ${a.tab} --file \\"%1\\"`
-      script += `
-New-Item -Path "${base}\\shell\\${a.id}" -Force | Out-Null
-Set-ItemProperty -Path "${base}\\shell\\${a.id}" -Name "(Default)" -Value "${a.label}" -Force
-New-Item -Path "${base}\\shell\\${a.id}\\command" -Force | Out-Null
-Set-ItemProperty -Path "${base}\\shell\\${a.id}\\command" -Name "(Default)" -Value "${cmd}" -Force
-`
-    }
-  }
+/** Registry default value — Set-ItemProperty cannot write it, Set-Item can. */
+function setDefault(key, value) {
+  return `Set-Item -Path ${psq(key)} -Value ${psq(value)} -Force\n`
+}
 
-  // ── Folder (Directory) entry ──────────────────────────────────
-  const dirBase = `${HKCU_DIR}\\shell\\LocalPrep`
-  script += `
-New-Item -Path "${dirBase}" -Force | Out-Null
-Set-ItemProperty -Path "${dirBase}" -Name "MUIVerb" -Value "LocalPrep" -Force
-Set-ItemProperty -Path "${dirBase}" -Name "SubCommands" -Value "" -Force
-New-Item -Path "${dirBase}\\shell" -Force | Out-Null
-`
+function setProp(key, name, value) {
+  return `Set-ItemProperty -Path ${psq(key)} -Name ${psq(name)} -Value ${psq(value)} -Force\n`
+}
+
+function newKey(key) {
+  return `New-Item -Path ${psq(key)} -Force | Out-Null\n`
+}
+
+/** The cascading parent plus its three actions, for one registry base path. */
+function menuScript(base, icon, exe, argName) {
+  let s = newKey(base)
+  s += setProp(base, 'MUIVerb', 'LocalPrep')
+  s += setProp(base, 'SubCommands', '')
+  s += setProp(base, 'Icon', icon)          // logo next to the name
+  s += newKey(`${base}\\shell`)
   for (const a of ACTIONS) {
-    const cmd = `\\"${exe}\\" --tab ${a.tab} --folder \\"%1\\"`
-    script += `
-New-Item -Path "${dirBase}\\shell\\${a.id}" -Force | Out-Null
-Set-ItemProperty -Path "${dirBase}\\shell\\${a.id}" -Name "(Default)" -Value "${a.label}" -Force
-New-Item -Path "${dirBase}\\shell\\${a.id}\\command" -Force | Out-Null
-Set-ItemProperty -Path "${dirBase}\\shell\\${a.id}\\command" -Name "(Default)" -Value "${cmd}" -Force
-`
+    const key = `${base}\\shell\\${a.id}`
+    s += newKey(key)
+    s += setDefault(key, a.label)
+    s += newKey(`${key}\\command`)
+    s += setDefault(`${key}\\command`, `${exe} --tab ${a.tab} --${argName} "%1"`)
   }
+  return s
+}
+
+async function register() {
+  const exe  = getExePath()
+  const icon = getIconRef()
+  let script = '$ErrorActionPreference = "Stop"\n'
+
+  for (const ext of EXTS) {
+    script += menuScript(`${HKCU}\\${ext}\\shell\\LocalPrep`, icon, exe, 'file')
+  }
+  script += menuScript(`${HKCU_DIR}\\shell\\LocalPrep`, icon, exe, 'folder')
 
   return _runPs(script)
 }
