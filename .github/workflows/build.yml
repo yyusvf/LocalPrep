@@ -112,9 +112,16 @@ jobs:
   #
   # Also drops the *.blockmap sidecar files (they only enable delta/diff
   # downloads for the auto-updater; without them an update is simply a full
-  # download instead) and fixes asset order. GitHub's release API has no
-  # "set display order" field — the documented workaround is to delete and
-  # re-upload assets in the order you want them to appear.
+  # download instead).
+  #
+  # Asset display order is NOT handled here. GitHub's release page (and its
+  # API) sorts assets alphabetically — case-insensitively, digits before
+  # letters — regardless of upload order; deleting and re-uploading in a
+  # chosen sequence was tried and confirmed (against the live v0.3.3
+  # release) to have no effect on what visitors actually see. The only real
+  # lever is the filename itself, so the installer names are chosen — see
+  # nsis.artifactName in package.json — so alphabetical order already puts
+  # both .exe files ahead of the .dmg.
   #
   # latest.yml / latest-mac.yml are kept: electron-updater reads them to
   # detect new versions at all, on both Windows and macOS.
@@ -124,7 +131,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Drop blockmaps, order assets, publish
+      - name: Drop blockmaps, publish
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -133,8 +140,6 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           REPO="${{ github.repository }}"
           tmp="$(mktemp -d)"
-
-          list_assets() { gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' > "$tmp/assets.txt"; }
 
           # electron-builder's own upload runs async with this job starting;
           # give the release a few tries to exist before giving up.
@@ -151,8 +156,7 @@ jobs:
             exit 1
           fi
 
-          # Drop every blockmap outright.
-          list_assets
+          gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' > "$tmp/assets.txt"
           mapfile -t assets < "$tmp/assets.txt"
           for name in "${assets[@]}"; do
             case "$name" in
@@ -161,30 +165,6 @@ jobs:
                 gh release delete-asset "$TAG" "$name" --repo "$REPO" --yes
                 ;;
             esac
-          done
-
-          # Re-order what's left: exe installers, then the dmg, then the
-          # update-feed ymls. Delete + re-upload in that order — GitHub shows
-          # assets in upload order, and there is no other way to set it.
-          list_assets
-          mapfile -t remaining < "$tmp/assets.txt"
-          ordered=()
-          for pat in '*Setup*.exe' '*Portable*.exe' '*.dmg' '*.yml'; do
-            for name in "${remaining[@]}"; do
-              case "$name" in
-                $pat) ordered+=("$name") ;;
-              esac
-            done
-          done
-
-          dl="$tmp/downloads"
-          mkdir -p "$dl"
-          for name in "${ordered[@]}"; do
-            gh release download "$TAG" --repo "$REPO" --pattern "$name" --dir "$dl" --clobber
-            gh release delete-asset "$TAG" "$name" --repo "$REPO" --yes
-          done
-          for name in "${ordered[@]}"; do
-            gh release upload "$TAG" "$dl/$name" --repo "$REPO"
           done
 
           gh release edit "$TAG" --repo "$REPO" --draft=false --latest

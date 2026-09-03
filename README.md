@@ -44,7 +44,7 @@ Desktop tool for preparing local audio files. Convert sample rates & formats, ed
 
 ### Installer (recommended)
 
-Download `LocalPrep-Setup-x.x.x.exe` from the [Releases](https://github.com/yyusvf/LocalPrep/releases) page and run it.
+Download `LocalPrep-x.x.x-Setup.exe` from the [Releases](https://github.com/yyusvf/LocalPrep/releases) page and run it.
 
 - Installs per-user (no admin required)
 - Receives automatic updates
